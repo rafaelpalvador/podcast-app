@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Podcast — App</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#0A0B0E}
+a{color:#F5B544}a:hover{color:#FFD07A}
+h1,h2,h3,p{margin:0}
+h1,h2,h3{font-family:Geist,Inter,sans-serif;letter-spacing:-0.025em;font-weight:600}
+button{font-family:Geist,Inter,sans-serif}
+.wrap{container-type:inline-size;width:100%;height:100vh;min-height:620px}
+.app{display:flex;height:100%;background:#0C0D10;color:#F3F4F6;font-family:Geist,Inter,sans-serif}
+.side{display:none}
+.col{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.main{flex:1;min-height:0;overflow-y:auto;padding:18px 18px 28px;box-sizing:border-box}
+.page{display:flex;flex-direction:column;gap:28px;max-width:1160px;margin:0 auto}
+.tabbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));height:74px;flex-shrink:0;background:#0C0D10;border-top:1px solid #1C1F26;padding:0 4px}
+.tb{background:none;border:0;font:500 11px Geist,Inter,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;padding:0}
+.tbi{width:56px;height:30px;border-radius:15px;display:flex;align-items:center;justify-content:center}
+.sb{background:none;border:0;height:42px;padding:0 12px;border-radius:12px;font:500 14px Geist,Inter,sans-serif;display:flex;align-items:center;gap:12px;cursor:pointer;text-align:left;width:100%}
+.bar{flex-shrink:0;margin:0 10px 8px;height:62px;border-radius:18px;background:#1D2027;display:flex;align-items:center;gap:12px;padding:0 7px;position:relative;overflow:hidden;border:1px solid #262A33}
+.wo{display:none}
+.pbtn{display:flex}
+.ib{width:44px;height:44px;border-radius:22px;border:0;background:#1A1D23;color:#F3F4F6;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;flex-shrink:0}
+.ib.ghost{background:transparent;color:#C7CCD6}
+.chip{height:36px;padding:0 14px;border-radius:18px;border:1px solid #2A2E37;background:transparent;color:#C7CCD6;font:500 13px Geist,Inter,sans-serif;white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.cov{border-radius:14px;display:flex;align-items:flex-end;padding:8px;box-sizing:border-box;font:700 15px Geist,Inter,sans-serif;letter-spacing:-0.02em;color:#0C0D10;position:relative;overflow:hidden;flex-shrink:0}
+.blob{position:absolute;right:-22%;top:-22%;width:70%;height:70%;border-radius:50%;background:#0C0D10;opacity:0.16}
+.card{border-radius:22px;background:#15171C;padding:16px;border:1px solid #1E2128}
+.sect{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px}
+.sect h2{font-size:19px}
+.more{font-size:13px;text-decoration:none;font-weight:500}
+.subs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:14px}
+.two{display:grid;grid-template-columns:minmax(0,1fr);gap:28px}
+.bento{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.span2{grid-column:span 2}
+.sets{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-items:start}
+.lbl{font:600 11px Geist,Inter,sans-serif;letter-spacing:0.08em;text-transform:uppercase;color:#A1A7B3}
+.ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mut{color:#A1A7B3}
+.hscroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px}
+.pl{display:flex;flex-wrap:wrap;gap:32px;justify-content:center;align-items:flex-start}
+.plL{flex:1 1 320px;max-width:440px;display:flex;flex-direction:column;gap:20px}
+.plR{flex:1 1 320px;max-width:520px;display:flex;flex-direction:column;gap:14px}
+.plcov{width:100%;max-width:300px;aspect-ratio:1;border-radius:30px;font-size:44px;padding:24px;align-self:center}
+.seg{display:flex;gap:4px;padding:4px;border-radius:22px;background:#15171C;border:1px solid #1E2128}
+.seg button{flex:1;height:34px;border-radius:17px;border:0;font:600 13px Geist,Inter,sans-serif;cursor:pointer;white-space:nowrap;padding:0 10px}
+.heat{display:grid;grid-template-columns:28px repeat(12,minmax(0,1fr));gap:3px;align-items:center}
+@container (min-width: 900px){
+  .side{display:flex;flex-direction:column;gap:2px;width:248px;flex-shrink:0;padding:22px 14px;background:#0A0B0E;border-right:1px solid #17191F;box-sizing:border-box;overflow-y:auto}
+  .tabbar,.mo{display:none}
+  .wo{display:flex}
+  .main{padding:34px 44px 44px}
+  .bar{margin:0;height:84px;border-radius:0;border:0;border-top:1px solid #1C1F26;background:#111317;padding:0 24px;gap:20px}
+  .subs{grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:20px}
+  .two{grid-template-columns:repeat(2,minmax(0,1fr));gap:36px}
+  .bento{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .sets{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .plcov{max-width:400px;font-size:60px}
+}
+</style>
+</helmet>
+<div class="wrap">
+<div class="app">
+
+  <aside class="side" aria-label="Menu">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 10px 24px"><svg width="34" height="34" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="23" fill="#14161B"></rect><circle cx="40" cy="50" r="21" fill="{{accent}}"></circle><path d="M35.5 41.5 L49 50 L35.5 58.5 Z" fill="#14161B" stroke="#14161B" stroke-width="2.5" stroke-linejoin="round"></path><path d="M65.2 30.3 A32 32 0 0 1 65.2 69.7" fill="none" stroke="{{accent}}" stroke-width="7" stroke-linecap="round"></path><path d="M77.3 26.7 A44 44 0 0 1 77.3 73.3" fill="none" stroke="{{accent}}" stroke-width="7" stroke-linecap="round" opacity="0.5"></path></svg><span style="font: 700 20px Geist, Inter, sans-serif; letter-spacing: -0.03em">Podcast</span></div>
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+      <button class="sb" onClick="{{t.go}}" style="color: {{t.fg}}; background: {{t.bg}}"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{t.dot}}"></span>{{t.t}}<sc-if value="{{t.hasBadge}}" hint-placeholder-val="{{false}}"><span style="margin-left: auto; min-width: 22px; height: 20px; border-radius: 10px; background: {{accent}}; color: #1A1305; font: 700 11px Geist, Inter, sans-serif; display: flex; align-items: center; justify-content: center; padding: 0 6px; box-sizing: border-box">{{t.badge}}</span></sc-if></button>
+    </sc-for>
+    <span class="lbl" style="padding: 24px 12px 8px">Pastas</span>
+    <sc-for list="{{folders}}" as="f" hint-placeholder-count="3"><button class="sb" onClick="{{go.lib}}" style="color: #C7CCD6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{f.c}}" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>{{f.t}}<span class="mut" style="margin-left: auto; font-size: 12px">{{f.n}}</span></button></sc-for>
+    <span class="lbl" style="padding: 20px 12px 8px">Playlists inteligentes</span>
+    <sc-for list="{{smart}}" as="p" hint-placeholder-count="3"><button class="sb" style="color: #C7CCD6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{p.c}}" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h10M17 9l2 2 3-4"></path></svg><span class="ell">{{p.t}}</span></button></sc-for>
+    <button onClick="{{go.login}}" style="margin-top: auto; padding: 12px; border-radius: 16px; border: 1px solid #1E2128; background: #15171C; display: flex; align-items: center; gap: 10px; cursor: pointer; text-align: left; color: #F3F4F6">
+      <span style="width: 32px; height: 32px; border-radius: 16px; background: #3D8BD9; color: #0C0D10; display: flex; align-items: center; justify-content: center; font: 700 13px Geist, Inter, sans-serif">R</span>
+      <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; font-weight: 600">Google Drive</span><span style="font-size: 11px; color: #7BC47F">Sincronizado há 2 min</span></span>
+    </button>
+  </aside>
+
+  <div class="col">
+    <main class="main" style="background: {{mainBg}}">
+      <sc-if value="{{is.home}}" hint-placeholder-val="{{true}}">
+        <div class="page">
+          <header style="display: flex; align-items: center; gap: 8px">
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span class="mut" style="font-size: 13px">Domingo, 8 de novembro</span><h1 style="font-size: 30px">Boa noite</h1></div>
+            <button class="ib" aria-label="Buscar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+            <button class="ib mo" onClick="{{go.login}}" aria-label="Conta Google" style="background: #3D8BD9; color: #0C0D10; font: 700 16px Geist, Inter, sans-serif">R</button>
+          </header>
+
+          <button onClick="{{openPlayer}}" style="border: 0; border-radius: 26px; background: #0F2629; padding: 16px; display: flex; gap: 16px; align-items: center; color: #F3F4F6; text-align: left; cursor: pointer; position: relative; overflow: hidden">
+            <span class="cov" style="width: 104px; height: 104px; background: #4FB3BF; border-radius: 18px; font-size: 20px; padding: 12px">CD<span class="blob"></span></span>
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+              <span class="lbl" style="color: #8FD8E0">Continuar · cap. 3 de 6</span>
+              <span style="font: 600 17px Geist, Inter, sans-serif; letter-spacing: -0.02em; line-height: 1.25">Dashboards que as pessoas realmente usam</span>
+              <span style="font-size: 12px; color: #A9C6C9">Café com Dados · faltam 18 min</span>
+              <span style="display: flex; gap: 3px; margin-top: 6px"><sc-for list="{{chSeg}}" as="c" hint-placeholder-count="6"><span style="flex: {{c.flex}}; height: 4px; border-radius: 2px; background: {{c.bg}}; display: block"></span></sc-for></span>
+            </span>
+            <span style="width: 52px; height: 52px; border-radius: 26px; background: {{accent}}; color: #1A1305; display: flex; align-items: center; justify-content: center; flex-shrink: 0" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></span>
+          </button>
+
+          <div class="two">
+            <section>
+              <div class="sect"><h2>Caixa de entrada <span class="mut" style="font-weight: 500">· {{inboxCount}}</span></h2><button onClick="{{clearInbox}}" class="more" style="background: none; border: 0; color: {{accent}}; cursor: pointer; font-family: Geist, Inter, sans-serif">Arquivar tudo</button></div>
+              <p class="mut" style="font-size: 13px; margin: -6px 0 12px; line-height: 1.45">Episódios novos chegam aqui. Você decide: fila, depois ou arquivo.</p>
+              <div style="display: flex; flex-direction: column; gap: 8px">
+                <sc-for list="{{inbox}}" as="e" hint-placeholder-count="3">
+                  <div class="card" style="padding: 12px; display: flex; flex-direction: column; gap: 10px; border-radius: 18px">
+                    <div style="display: flex; gap: 12px; align-items: center">
+                      <span class="cov" style="width: 48px; height: 48px; background: {{e.c}}; font-size: 12px; padding: 6px">{{e.i}}</span>
+                      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px"><span class="ell" style="font-size: 14px; font-weight: 600">{{e.t}}</span><span class="mut" style="font-size: 12px">{{e.m}}</span></div>
+                    </div>
+                    <div style="display: flex; gap: 6px">
+                      <button onClick="{{e.queue}}" style="flex: 1; height: 36px; border-radius: 18px; border: 0; background: {{accent}}; color: #1A1305; font: 600 13px Geist, Inter, sans-serif; cursor: pointer">+ Fila</button>
+                      <button onClick="{{e.next}}" style="flex: 1; height: 36px; border-radius: 18px; border: 1px solid #2A2E37; background: transparent; color: #F3F4F6; font: 500 13px Geist, Inter, sans-serif; cursor: pointer">Tocar a seguir</button>
+                      <button onClick="{{e.archive}}" aria-label="Arquivar" style="width: 44px; height: 36px; border-radius: 18px; border: 1px solid #2A2E37; background: transparent; color: #A1A7B3; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M6 7v12h12V7M10 11h4"></path></svg></button>
+                    </div>
+                  </div>
+                </sc-for>
+                <sc-if value="{{inboxEmpty}}" hint-placeholder-val="{{false}}"><div class="card" style="text-align: center; padding: 22px; display: flex; flex-direction: column; gap: 4px"><span style="font-weight: 600">Tudo em dia</span><span class="mut" style="font-size: 13px">Nenhum episódio novo esperando.</span></div></sc-if>
+              </div>
+            </section>
+
+            <section>
+              <div class="sect"><h2>Fila <span class="mut" style="font-weight: 500">· {{queueTotal}}</span></h2><a href="#" class="more">Editar</a></div>
+              <div style="display: flex; flex-direction: column">
+                <sc-for list="{{queue}}" as="q" hint-placeholder-count="4">
+                  <div style="display: flex; align-items: center; gap: 12px; padding: 7px 0">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#4A505C" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg>
+                    <span class="cov" style="width: 46px; height: 46px; background: {{q.c}}; font-size: 11px; padding: 6px">{{q.i}}</span>
+                    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px"><span class="ell" style="font-size: 14px; font-weight: 500">{{q.t}}</span><span class="mut" style="font-size: 12px">{{q.m}}</span></span>
+                    <sc-if value="{{q.dl}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7BC47F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Baixado"><path d="m5 12 5 5L20 7"></path></svg></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+          </div>
+
+          <section>
+            <div class="sect"><h2>Momentos salvos</h2><a href="#" class="more">Exportar</a></div>
+            <div class="hscroll">
+              <sc-for list="{{snips}}" as="s" hint-placeholder-count="3">
+                <div class="card" style="flex: 0 0 260px; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 20px">
+                  <div style="display: flex; align-items: center; gap: 8px"><span class="cov" style="width: 28px; height: 28px; border-radius: 8px; background: {{s.c}}; font-size: 9px; padding: 4px">{{s.i}}</span><span class="mut ell" style="font-size: 12px; flex: 1">{{s.p}}</span><span style="font-size: 12px; color: {{accent}}; font-weight: 600">{{s.at}}</span></div>
+                  <p style="font-size: 14px; line-height: 1.45">“{{s.q}}”</p>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+      <sc-if value="{{is.lib}}" hint-placeholder-val="{{false}}">
+        <div class="page">
+          <header style="display: flex; align-items: center; gap: 8px">
+            <h1 style="font-size: 30px; flex: 1">Biblioteca</h1>
+            <button class="ib" aria-label="Ordenar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"></path></svg></button>
+            <button class="ib" aria-label="Adicionar por link, RSS ou OPML"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+          </header>
+          <div style="display: flex; gap: 8px; overflow-x: auto">
+            <sc-for list="{{filters}}" as="f" hint-placeholder-count="5"><button class="chip" onClick="{{f.pick}}" style="background: {{f.bg}}; color: {{f.fg}}; border-color: {{f.bd}}">{{f.t}}</button></sc-for>
+          </div>
+          <section>
+            <div class="sect"><h2>Pastas</h2><a href="#" class="more">Nova pasta</a></div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px">
+              <sc-for list="{{folders}}" as="f" hint-placeholder-count="3">
+                <button class="card" style="padding: 12px; display: flex; flex-direction: column; gap: 10px; color: #F3F4F6; text-align: left; cursor: pointer">
+                  <span style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; width: 100%"><sc-for list="{{f.covers}}" as="c" hint-placeholder-count="4"><span style="aspect-ratio: 1; border-radius: 8px; background: {{c}}; display: block"></span></sc-for></span>
+                  <span style="display: flex; justify-content: space-between; width: 100%; font-size: 14px; font-weight: 600">{{f.t}}<span class="mut" style="font-weight: 500">{{f.n}}</span></span>
+                </button>
+              </sc-for>
+            </div>
+          </section>
+          <section>
+            <div class="sect"><h2>Playlists inteligentes</h2><a href="#" class="more">Criar regra</a></div>
+            <div class="card" style="padding: 4px 16px">
+              <sc-for list="{{smart}}" as="p" hint-placeholder-count="3">
+                <div style="display: flex; align-items: center; gap: 14px; padding: 12px 0; border-top: {{p.line}}">
+                  <span style="width: 40px; height: 40px; border-radius: 12px; background: #1D2027; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{p.c}}" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h10M17 9l2 2 3-4"></path></svg></span>
+                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 14px; font-weight: 600">{{p.t}}</span><span class="mut" style="font-size: 12px">{{p.rule}}</span></span>
+                  <span class="mut" style="font-size: 13px">{{p.n}}</span>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+          <section>
+            <div class="sect"><h2>Inscrições <span class="mut" style="font-weight: 500">· 9</span></h2></div>
+            <div class="subs">
+              <sc-for list="{{subs}}" as="s" hint-placeholder-count="9">
+                <button onClick="{{s.open}}" style="background: none; border: 0; padding: 0; color: #F3F4F6; display: flex; flex-direction: column; gap: 7px; min-width: 0; cursor: pointer; text-align: left">
+                  <span class="cov" style="width: 100%; aspect-ratio: 1; background: {{s.c}}">{{s.i}}<span class="blob"></span>
+                    <sc-if value="{{s.hasNew}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: 7px; right: 7px; min-width: 22px; height: 22px; border-radius: 11px; background: #0C0D10; color: #F3F4F6; font: 700 11px Geist, Inter, sans-serif; display: flex; align-items: center; justify-content: center; padding: 0 6px; box-sizing: border-box">{{s.n}}</span></sc-if>
+                  </span>
+                  <span class="ell" style="font-size: 12px; font-weight: 500; width: 100%">{{s.t}}</span>
+                </button>
+              </sc-for>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+      <sc-if value="{{is.show}}" hint-placeholder-val="{{false}}">
+        <div class="page" style="gap: 24px">
+          <button class="ib" onClick="{{go.lib}}" aria-label="Voltar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button>
+          <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end">
+            <span class="cov" style="width: 140px; height: 140px; border-radius: 24px; background: #F2C14E; font-size: 28px; padding: 14px">RL<span class="blob"></span></span>
+            <div style="flex: 1 1 240px; display: flex; flex-direction: column; gap: 8px">
+              <h1 style="font-size: 30px">Rota Linux</h1>
+              <span class="mut" style="font-size: 14px">Marcos Lima · Tecnologia · semanal</span>
+              <div style="display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap">
+                <button style="height: 40px; padding: 0 18px; border-radius: 20px; border: 0; background: #F3F4F6; color: #0C0D10; font: 600 14px Geist, Inter, sans-serif; cursor: pointer">Seguindo</button>
+                <button class="chip" style="height: 40px">Pasta: Tecnologia</button>
+                <button class="ib" aria-label="Compartilhar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 14v6h14v-6"></path></svg></button>
+              </div>
+            </div>
+          </div>
+          <p class="mut" style="font-size: 14px; line-height: 1.55; max-width: 720px">Distros, terminal e software livre explicados sem pressa. Um episódio novo toda sexta.</p>
+          <div class="two">
+            <section>
+              <div class="sect"><h2>Ajustes deste podcast</h2></div>
+              <div class="card" style="padding: 4px 16px">
+                <sc-for list="{{showSet}}" as="r" hint-placeholder-count="6">
+                  <div style="display: flex; align-items: center; gap: 12px; min-height: 54px; border-top: {{r.line}}">
+                    <span style="flex: 1; font-size: 14px; font-weight: 500">{{r.t}}</span>
+                    <span style="font-size: 13px; color: {{r.fg}}; font-weight: 600">{{r.v}}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 8px">
+                <span class="lbl">Episódios novos vão para</span>
+                <div class="seg"><sc-for list="{{dest}}" as="d" hint-placeholder-count="3"><button onClick="{{d.pick}}" style="background: {{d.bg}}; color: {{d.fg}}">{{d.t}}</button></sc-for></div>
+              </div>
+            </section>
+            <section>
+              <div class="sect"><h2>Episódios</h2><span class="mut" style="font-size: 13px">Mais novos</span></div>
+              <sc-for list="{{showEps}}" as="e" hint-placeholder-count="4">
+                <div style="display: flex; gap: 14px; padding: 12px 0; border-top: 1px solid #1C1F26; align-items: center">
+                  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+                    <span class="mut" style="font-size: 12px">{{e.d}}</span>
+                    <span style="font-size: 14px; font-weight: 600; line-height: 1.3">{{e.t}}</span>
+                    <span style="display: flex; gap: 6px; align-items: center; font-size: 12px" class="mut">{{e.len}}<sc-if value="{{e.tr}}" hint-placeholder-val="{{true}}"><span style="border: 1px solid #2A2E37; border-radius: 6px; padding: 1px 6px; font-size: 11px">Transcrição</span></sc-if><sc-if value="{{e.ch}}" hint-placeholder-val="{{true}}"><span style="border: 1px solid #2A2E37; border-radius: 6px; padding: 1px 6px; font-size: 11px">Capítulos</span></sc-if></span>
+                  </div>
+                  <button class="ib" aria-label="Tocar {{e.t}}" style="border: 2px solid {{e.ring}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg></button>
+                </div>
+              </sc-for>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{is.disc}}" hint-placeholder-val="{{false}}">
+        <div class="page">
+          <h1 style="font-size: 30px">Descobrir</h1>
+          <label style="display: flex; align-items: center; gap: 10px; height: 50px; padding: 0 18px; border-radius: 25px; background: #15171C; border: 1px solid #1E2128; color: #A1A7B3; max-width: 680px">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+            <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Buscar podcasts</span>
+            <input type="search" placeholder="Programas, pessoas, temas, trechos falados ou RSS" style="flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: #F3F4F6; font: 400 15px Geist, Inter, sans-serif">
+          </label>
+          <section style="border-radius: 26px; background: #1A1610; border: 1px solid #2B2416; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+            <div style="display: flex; flex-direction: column; gap: 6px"><span class="lbl" style="color: {{accent}}">Para você</span><h2 style="font-size: 22px">Porque você ouve muito Café com Dados</h2><span style="font-size: 13px; color: #B7AE9C">9 h em Tecnologia e Dados este mês, quase sempre à noite</span></div>
+            <div class="subs">
+              <sc-for list="{{forYou}}" as="p" hint-placeholder-count="4">
+                <a href="#" style="display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: #F3F4F6; min-width: 0"><span class="cov" style="width: 100%; aspect-ratio: 1; background: {{p.c}}">{{p.i}}<span class="blob"></span></span><span class="ell" style="font-size: 13px; font-weight: 600">{{p.t}}</span><span style="font-size: 11px; color: #B7AE9C">{{p.why}}</span></a>
+              </sc-for>
+            </div>
+          </section>
+          <section>
+            <div class="sect"><h2>Episódios que combinam com você</h2></div>
+            <div class="hscroll">
+              <sc-for list="{{epRecs}}" as="e" hint-placeholder-count="3">
+                <div class="card" style="flex: 0 0 250px; display: flex; flex-direction: column; gap: 10px; padding: 14px">
+                  <div style="display: flex; gap: 10px; align-items: center"><span class="cov" style="width: 40px; height: 40px; background: {{e.c}}; font-size: 10px; padding: 5px">{{e.i}}</span><span class="mut ell" style="font-size: 12px">{{e.p}}</span></div>
+                  <span style="font-size: 14px; font-weight: 600; line-height: 1.35">{{e.t}}</span>
+                  <div style="display: flex; justify-content: space-between; align-items: center"><span class="mut" style="font-size: 12px">{{e.len}}</span><button style="height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid #2A2E37; background: transparent; color: #F3F4F6; font: 500 12px Geist, Inter, sans-serif; cursor: pointer">Ouvir trecho</button></div>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+          <section>
+            <div class="sect"><h2>Categorias</h2></div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{cats}}" as="k" hint-placeholder-count="8"><button class="chip"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{k.c}}"></span>{{k.t}}</button></sc-for></div>
+          </section>
+          <div class="two">
+            <section>
+              <div class="sect"><h2>Em alta em Tecnologia</h2><a href="#" class="more">Ranking</a></div>
+              <sc-for list="{{top}}" as="r" hint-placeholder-count="4">
+                <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0">
+                  <span style="width: 22px; font: 700 18px Geist, Inter, sans-serif; color: #7D8491">{{r.n}}</span>
+                  <span class="cov" style="width: 54px; height: 54px; background: {{r.c}}; font-size: 12px; padding: 6px">{{r.i}}</span>
+                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 14px; font-weight: 600">{{r.t}}</span><span class="mut" style="font-size: 12px">{{r.m}}</span></span>
+                  <button class="ib ghost" aria-label="Seguir {{r.t}}" style="border: 1px solid #2A2E37"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+                </div>
+              </sc-for>
+            </section>
+            <section style="display: flex; flex-direction: column; gap: 26px">
+              <div>
+                <div class="sect"><h2>Indicados pelos criadores</h2></div>
+                <div style="display: flex; flex-direction: column; gap: 8px"><sc-for list="{{podroll}}" as="p" hint-placeholder-count="3"><div class="card" style="padding: 12px; display: flex; gap: 12px; align-items: center; border-radius: 18px"><span class="cov" style="width: 42px; height: 42px; background: {{p.c}}; font-size: 11px; padding: 5px">{{p.i}}</span><span style="display: flex; flex-direction: column; gap: 2px; flex: 1"><span style="font-size: 13px; font-weight: 600">{{p.t}}</span><span class="mut" style="font-size: 12px">indicado por {{p.via}}</span></span></div></sc-for></div>
+              </div>
+              <div>
+                <div class="sect"><h2>Mais de quem você gosta</h2></div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap"><sc-for list="{{guests}}" as="g" hint-placeholder-count="3"><button class="chip" style="height: 44px; padding: 0 14px 0 6px"><span style="width: 32px; height: 32px; border-radius: 16px; background: {{g.c}}; color: #0C0D10; display: flex; align-items: center; justify-content: center; font: 700 12px Geist, Inter, sans-serif">{{g.i}}</span>{{g.n}} · {{g.eps}}</button></sc-for></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{is.stats}}" hint-placeholder-val="{{false}}">
+        <div class="page">
+          <header style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap"><h1 style="font-size: 30px">Estatísticas</h1><span class="mut" style="font-size: 11px; border: 1px solid #2A2E37; border-radius: 10px; padding: 3px 8px">dados de exemplo</span></header>
+          <div class="seg" style="max-width: 460px"><sc-for list="{{periods}}" as="p" hint-placeholder-count="4"><button onClick="{{p.pick}}" style="background: {{p.bg}}; color: {{p.fg}}">{{p.t}}</button></sc-for></div>
+          <div class="bento">
+            <div class="card span2" style="display: flex; flex-direction: column; gap: 4px; padding: 20px"><span class="mut" style="font-size: 13px">Tempo ouvindo</span><span style="font: 700 46px Geist, Inter, sans-serif; letter-spacing: -0.04em">{{v.hours}}</span><span style="font-size: 13px; color: #7BC47F">{{v.delta}}</span></div>
+            <div class="card span2" style="display: flex; flex-direction: column; gap: 8px; padding: 20px"><span class="mut" style="font-size: 13px">Tempo economizado</span><span style="font: 700 34px Geist, Inter, sans-serif; letter-spacing: -0.03em; color: {{accent}}">{{v.saved}}</span><div style="display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px"><div style="width: 62%; background: {{accent}}"></div><div style="width: 38%; background: #8A6A2E"></div></div><span class="mut" style="font-size: 12px">62% velocidade · 38% corte de silêncio</span></div>
+            <div class="card" style="display: flex; flex-direction: column; gap: 4px"><span style="font: 700 24px Geist, Inter, sans-serif">{{v.eps}}</span><span class="mut" style="font-size: 12px">episódios concluídos</span></div>
+            <div class="card" style="display: flex; flex-direction: column; gap: 4px"><span style="font: 700 24px Geist, Inter, sans-serif">{{v.streak}}</span><span class="mut" style="font-size: 12px">dias seguidos</span></div>
+            <div class="card" style="display: flex; flex-direction: column; gap: 4px"><span style="font: 700 24px Geist, Inter, sans-serif">{{v.snips}}</span><span class="mut" style="font-size: 12px">momentos salvos</span></div>
+            <div class="card" style="display: flex; flex-direction: column; gap: 4px"><span style="font: 700 24px Geist, Inter, sans-serif">{{v.shows}}</span><span class="mut" style="font-size: 12px">podcasts diferentes</span></div>
+          </div>
+          <div class="two">
+            <section class="card" style="padding: 18px">
+              <div class="sect"><h2 style="font-size: 16px">Quando você ouve</h2><span class="mut" style="font-size: 12px">dia × horário</span></div>
+              <div style="display: flex; flex-direction: column; gap: 3px">
+                <sc-for list="{{heat}}" as="row" hint-placeholder-count="7">
+                  <div class="heat"><span class="mut" style="font-size: 10px">{{row.d}}</span><sc-for list="{{row.cells}}" as="c" hint-placeholder-count="12"><span style="height: 18px; border-radius: 4px; background: {{c.bg}}; display: block"></span></sc-for></div>
+                </sc-for>
+                <div class="heat" style="margin-top: 4px"><span></span><span class="mut" style="font-size: 9px; grid-column: span 3">0h</span><span class="mut" style="font-size: 9px; grid-column: span 3">6h</span><span class="mut" style="font-size: 9px; grid-column: span 3">12h</span><span class="mut" style="font-size: 9px; grid-column: span 3">18h</span></div>
+              </div>
+              <p class="mut" style="font-size: 12px; margin-top: 12px">Seu horário forte: domingo à noite, entre 20h e 22h.</p>
+            </section>
+            <section>
+              <div class="sect"><h2 style="font-size: 16px">O que você ouviu</h2><a href="#" class="more">Histórico</a></div>
+              <div style="display: flex; flex-direction: column; gap: 14px">
+                <sc-for list="{{shows}}" as="s" hint-placeholder-count="4">
+                  <div style="display: flex; align-items: center; gap: 12px"><span class="cov" style="width: 42px; height: 42px; background: {{s.c}}; font-size: 10px; padding: 5px">{{s.i}}</span><div style="flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0"><div style="display: flex; justify-content: space-between; font-size: 13px"><span style="font-weight: 600">{{s.t}}</span><span class="mut">{{s.h}}</span></div><div style="height: 6px; border-radius: 3px; background: #1D2027"><div style="height: 6px; border-radius: 3px; width: {{s.w}}; background: {{s.c}}"></div></div></div></div>
+                </sc-for>
+              </div>
+              <div class="sect" style="margin-top: 26px"><h2 style="font-size: 16px">De quem você ouviu</h2></div>
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+                <sc-for list="{{people}}" as="p" hint-placeholder-count="4"><div class="card" style="padding: 10px; border-radius: 16px; display: flex; align-items: center; gap: 10px"><span style="width: 34px; height: 34px; border-radius: 17px; background: {{p.c}}; color: #0C0D10; display: flex; align-items: center; justify-content: center; font: 700 12px Geist, Inter, sans-serif; flex-shrink: 0">{{p.i}}</span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span class="ell" style="font-size: 13px; font-weight: 600">{{p.n}}</span><span class="mut" style="font-size: 11px">{{p.m}}</span></span></div></sc-for>
+              </div>
+            </section>
+          </div>
+          <section style="border-radius: 26px; background: #17131F; border: 1px solid #2A2238; padding: 22px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center">
+            <div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 8px"><span class="lbl" style="color: #C3A6E6">Retrospectiva 2026</span><h2 style="font-size: 24px">Seu ano em podcasts</h2><p style="font-size: 13px; color: #B9AFC9; line-height: 1.5">Em dezembro: seus programas do ano, a pessoa que você mais ouviu, seu momento favorito e quanto tempo você economizou. Tudo gerado no aparelho, pronto para compartilhar.</p></div>
+            <div style="display: flex; gap: 8px"><span style="width: 70px; height: 110px; border-radius: 14px; background: #B48EE0; display: block"></span><span style="width: 70px; height: 110px; border-radius: 14px; background: #4FB3BF; display: block; margin-top: 14px"></span><span style="width: 70px; height: 110px; border-radius: 14px; background: {{accent}}; display: block"></span></div>
+          </section>
+        </div>
+      </sc-if>
+      <sc-if value="{{is.set}}" hint-placeholder-val="{{false}}">
+        <div class="page">
+          <h1 style="font-size: 30px">Ajustes</h1>
+          <button onClick="{{go.login}}" class="card" style="display: flex; align-items: center; gap: 14px; color: #F3F4F6; text-align: left; cursor: pointer; max-width: 680px">
+            <span style="width: 52px; height: 52px; border-radius: 26px; background: #3D8BD9; color: #0C0D10; display: flex; align-items: center; justify-content: center; font: 700 20px Geist, Inter, sans-serif; flex-shrink: 0">R</span>
+            <span style="flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0"><span style="font-size: 15px; font-weight: 600">Conta Google conectada</span><span class="mut" style="font-size: 12px">Sincronizado há 2 min · celular e PC</span></span>
+            <span style="height: 36px; padding: 0 14px; border-radius: 18px; background: {{accent}}; color: #1A1305; display: flex; align-items: center; font: 600 13px Geist, Inter, sans-serif">Sincronizar</span>
+          </button>
+          <label style="display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 16px; border-radius: 23px; background: #15171C; border: 1px solid #1E2128; color: #A1A7B3; max-width: 680px">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+            <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Buscar ajuste</span>
+            <input type="search" placeholder="Buscar ajuste" style="flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: #F3F4F6; font: 400 14px Geist, Inter, sans-serif">
+          </label>
+          <div class="sets">
+            <sc-for list="{{groups}}" as="g" hint-placeholder-count="6">
+              <section style="display: flex; flex-direction: column; gap: 8px">
+                <h2 class="lbl" style="padding: 0 4px">{{g.t}}</h2>
+                <div style="border-radius: 20px; background: #15171C; border: 1px solid #1E2128; overflow: hidden">
+                  <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="4">
+                    <div style="min-height: 56px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; border-top: {{r.line}}; box-sizing: border-box">
+                      <div style="flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-size: 14px; font-weight: 500">{{r.t}}</span><sc-if value="{{r.hasSub}}" hint-placeholder-val="{{false}}"><span class="mut" style="font-size: 12px; line-height: 1.35">{{r.sub}}</span></sc-if></div>
+                      <sc-if value="{{r.isToggle}}" hint-placeholder-val="{{true}}"><button onClick="{{r.flip}}" role="switch" aria-checked="{{r.on}}" aria-label="{{r.t}}" style="width: 52px; height: 32px; border-radius: 16px; border: 0; padding: 3px; background: {{r.track}}; display: flex; justify-content: {{r.align}}; cursor: pointer; flex-shrink: 0"><span style="width: 26px; height: 26px; border-radius: 13px; background: {{r.knob}}"></span></button></sc-if>
+                      <sc-if value="{{r.isValue}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: #C7CCD6; display: flex; align-items: center; gap: 4px; white-space: nowrap">{{r.val}}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7D8491" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></span></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{is.player}}" hint-placeholder-val="{{false}}">
+        <div class="page" style="gap: 20px">
+          <header style="display: flex; align-items: center; justify-content: space-between">
+            <button class="ib" onClick="{{closePlayer}}" aria-label="Fechar player" style="background: #15302F"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <span class="lbl" style="color: #8FD8E0">Tocando da fila</span>
+            <button class="ib" aria-label="Transmitir para outro aparelho" style="background: #15302F"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 18a3 3 0 0 1 3 3M3 14a7 7 0 0 1 7 7M3 10a11 11 0 0 1 11 11"></path><path d="M3 7V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path></svg></button>
+          </header>
+          <div class="pl">
+            <div class="plL">
+              <div class="cov plcov" style="background: #4FB3BF">CD<span class="blob"></span></div>
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <span style="font-size: 13px; color: #8FD8E0; font-weight: 600">Capítulo 3 · Escolhendo o gráfico certo</span>
+                <h1 style="font-size: 24px; line-height: 1.2">Dashboards que as pessoas realmente usam</h1>
+                <span style="font-size: 14px; color: #A9C6C9">Café com Dados · com Ana Ribeiro</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px">
+                <div style="display: flex; gap: 3px; align-items: center; height: 14px"><sc-for list="{{chSeg}}" as="c" hint-placeholder-count="6"><span style="flex: {{c.flex}}; height: {{c.h}}; border-radius: 3px; background: {{c.bg}}; display: block"></span></sc-for></div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #A9C6C9"><span>29:40</span><span>−18:02 a {{speed}}×</span></div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between">
+                <button class="ib ghost" aria-label="Capítulo anterior"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z"></path></svg></button>
+                <button class="ib ghost" aria-label="Voltar 15 segundos" style="width: 56px; height: 56px; flex-direction: column; font: 700 10px Geist, Inter, sans-serif"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5"></path></svg>15</button>
+                <button onClick="{{toggle}}" aria-label="{{playLabel}}" style="width: 80px; height: 80px; border-radius: 28px; border: 0; background: {{accent}}; color: #1A1305; display: flex; align-items: center; justify-content: center; cursor: pointer">
+                  <sc-if value="{{playing}}" hint-placeholder-val="{{true}}"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg></sc-if>
+                  <sc-if value="{{paused}}" hint-placeholder-val="{{false}}"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg></sc-if>
+                </button>
+                <button class="ib ghost" aria-label="Avançar 30 segundos" style="width: 56px; height: 56px; flex-direction: column; font: 700 10px Geist, Inter, sans-serif"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"></path><path d="M21 3v5h-5"></path></svg>30</button>
+                <button class="ib ghost" aria-label="Próximo capítulo"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5v14l11-7z"></path></svg></button>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <button onClick="{{cycleSpeed}}" style="height: 40px; padding: 0 14px; border-radius: 20px; border: 0; background: #15302F; color: #F3F4F6; font: 700 13px Geist, Inter, sans-serif; cursor: pointer">{{speed}}×</button>
+                <sc-for list="{{tools}}" as="t" hint-placeholder-count="3"><button onClick="{{t.flip}}" aria-pressed="{{t.on}}" style="height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid {{t.border}}; background: {{t.bg}}; color: {{t.fg}}; font: 600 13px Geist, Inter, sans-serif; cursor: pointer">{{t.label}}</button></sc-for>
+              </div>
+              <button onClick="{{saveSnip}}" style="height: 52px; border-radius: 26px; border: 1px solid #2E5A5C; background: #12292A; color: #F3F4F6; font: 600 15px Geist, Inter, sans-serif; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"></path></svg>{{snipLabel}}</button>
+            </div>
+            <div class="plR">
+              <div style="display: flex; gap: 4px; border-bottom: 1px solid #1F3A3B; overflow-x: auto">
+                <sc-for list="{{ptabs}}" as="t" hint-placeholder-count="4"><button onClick="{{t.pick}}" style="height: 44px; padding: 0 12px; background: none; border: 0; border-bottom: 2px solid {{t.bd}}; color: {{t.fg}}; font: 600 14px Geist, Inter, sans-serif; cursor: pointer; white-space: nowrap">{{t.t}}</button></sc-for>
+              </div>
+              <sc-if value="{{pt.ch}}" hint-placeholder-val="{{true}}">
+                <div style="display: flex; flex-direction: column"><sc-for list="{{chapters}}" as="c" hint-placeholder-count="6"><div style="display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid #16292A"><span style="font-size: 12px; width: 44px; color: #A9C6C9">{{c.at}}</span><span style="font-size: 14px; flex: 1; color: {{c.fg}}; font-weight: {{c.w}}">{{c.t}}</span><span style="font-size: 12px; color: #A9C6C9">{{c.len}}</span></div></sc-for></div>
+              </sc-if>
+              <sc-if value="{{pt.tr}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; flex-direction: column; gap: 14px">
+                  <span style="font-size: 12px; color: #A9C6C9">Toque numa frase para pular até ela · busca dentro do episódio</span>
+                  <sc-for list="{{transcript}}" as="l" hint-placeholder-count="5"><p style="font-size: {{l.size}}; line-height: 1.5; color: {{l.fg}}; font-weight: {{l.w}}"><span style="font-size: 11px; color: #6F9C9F; margin-right: 8px">{{l.who}}</span>{{l.t}}</p></sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{pt.sn}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; flex-direction: column; gap: 10px">
+                  <sc-for list="{{epSnips}}" as="s" hint-placeholder-count="2"><div style="border-radius: 18px; background: #12292A; padding: 14px; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: {{accent}}; font-weight: 600">{{s.at}}</span><p style="font-size: 14px; line-height: 1.45">“{{s.q}}”</p></div></sc-for>
+                  <span style="font-size: 12px; color: #A9C6C9">Dica: toque 3 vezes no fone para salvar um momento sem pegar o celular. Exporte em Markdown para o Obsidian.</span>
+                </div>
+              </sc-if>
+              <sc-if value="{{pt.nt}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; flex-direction: column; gap: 12px">
+                  <p style="font-size: 14px; line-height: 1.55; color: #D4E3E4">Ana Ribeiro conta como redesenhou o painel de vendas de uma rede de lojas, cortando de 40 para 8 indicadores, e por que entrevistar quem usa o painel vem antes de escolher o gráfico.</p>
+                  <span class="lbl" style="color: #8FD8E0">Citados no episódio</span>
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px"><span class="chip" style="cursor: default">Livro: Storytelling com Dados</span><span class="chip" style="cursor: default">Ferramenta: Metabase</span><span class="chip" style="cursor: default">Ep. 120</span></div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{is.login}}" hint-placeholder-val="{{false}}">
+        <div class="page" style="max-width: 440px; min-height: 100%; justify-content: center; gap: 24px">
+          <div style="display: flex; align-items: center; gap: 12px"><svg width="52" height="52" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="23" fill="#14161B"></rect><circle cx="40" cy="50" r="21" fill="{{accent}}"></circle><path d="M35.5 41.5 L49 50 L35.5 58.5 Z" fill="#14161B" stroke="#14161B" stroke-width="2.5" stroke-linejoin="round"></path><path d="M65.2 30.3 A32 32 0 0 1 65.2 69.7" fill="none" stroke="{{accent}}" stroke-width="7" stroke-linecap="round"></path><path d="M77.3 26.7 A44 44 0 0 1 77.3 73.3" fill="none" stroke="{{accent}}" stroke-width="7" stroke-linecap="round" opacity="0.5"></path></svg><span style="font: 700 26px Geist, Inter, sans-serif; letter-spacing: -0.03em">Podcast</span></div>
+          <h1 style="font-size: 36px; line-height: 1.08; letter-spacing: -0.035em">Seus podcasts, no celular e no PC.</h1>
+          <p class="mut" style="font-size: 15px; line-height: 1.5">Entre com o Google para guardar tudo numa pasta privada do seu Drive. Nenhum servidor no meio, nenhum anúncio.</p>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px">
+            <sc-for list="{{syncs}}" as="it" hint-placeholder-count="4"><li style="display: flex; gap: 12px; align-items: center; font-size: 14px"><span style="width: 30px; height: 30px; border-radius: 10px; background: #1A1D23; color: {{accent}}; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"></path></svg></span>{{it}}</li></sc-for>
+          </ul>
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <button onClick="{{go.home}}" style="height: 56px; border-radius: 28px; border: 0; background: #F3F4F6; color: #1F1F1F; font: 600 16px Geist, Inter, sans-serif; display: flex; align-items: center; justify-content: center; gap: 12px; cursor: pointer"><span style="width: 26px; height: 26px; border-radius: 13px; border: 2px solid #1F1F1F; display: flex; align-items: center; justify-content: center; font: 700 14px Geist, Inter, sans-serif; box-sizing: border-box">G</span>Entrar com Google</button>
+            <button onClick="{{go.home}}" style="height: 52px; border-radius: 26px; border: 1px solid #2A2E37; background: transparent; color: #F3F4F6; font: 500 15px Geist, Inter, sans-serif; cursor: pointer">Usar sem conta (só neste aparelho)</button>
+            <button style="height: 44px; border: 0; background: transparent; color: {{accent}}; font: 500 14px Geist, Inter, sans-serif; cursor: pointer">Importar de outro app (OPML)</button>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+
+    <sc-if value="{{showBar}}" hint-placeholder-val="{{true}}">
+      <div class="bar">
+        <button onClick="{{openPlayer}}" style="flex: 1 1 240px; display: flex; align-items: center; gap: 12px; min-width: 0; background: none; border: 0; padding: 0; color: #F3F4F6; text-align: left; cursor: pointer">
+          <span class="cov" style="width: 46px; height: 46px; background: #4FB3BF; font-size: 12px; padding: 6px; border-radius: 12px">CD</span>
+          <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span class="ell" style="font-size: 13px; font-weight: 600">Dashboards que as pessoas realmente usam</span><span class="mut" style="font-size: 12px">Cap. 3 · Escolhendo o gráfico certo</span></span>
+        </button>
+        <div class="wo" style="flex: 2 1 360px; flex-direction: column; gap: 4px; align-items: center">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <button class="ib ghost" aria-label="Voltar 15 segundos" style="font: 700 11px Geist, Inter, sans-serif">−15</button>
+            <button onClick="{{toggle}}" aria-label="{{playLabel}}" style="width: 46px; height: 46px; border-radius: 16px; border: 0; background: {{accent}}; color: #1A1305; display: flex; align-items: center; justify-content: center; cursor: pointer"><sc-if value="{{playing}}" hint-placeholder-val="{{true}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg></sc-if><sc-if value="{{paused}}" hint-placeholder-val="{{false}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg></sc-if></button>
+            <button class="ib ghost" aria-label="Avançar 30 segundos" style="font: 700 11px Geist, Inter, sans-serif">+30</button>
+          </div>
+          <div style="width: 100%; display: flex; align-items: center; gap: 10px; font-size: 11px" class="mut"><span>29:40</span><div style="flex: 1; display: flex; gap: 2px"><sc-for list="{{chSeg}}" as="c" hint-placeholder-count="6"><span style="flex: {{c.flex}}; height: 4px; border-radius: 2px; background: {{c.bg}}; display: block"></span></sc-for></div><span>47:42</span></div>
+        </div>
+        <div class="wo" style="flex: 1 1 220px; justify-content: flex-end; gap: 2px">
+          <button class="ib ghost" onClick="{{cycleSpeed}}" aria-label="Velocidade" style="width: auto; padding: 0 12px; font: 700 13px Geist, Inter, sans-serif">{{speed}}×</button>
+          <button class="ib ghost" onClick="{{saveSnip}}" aria-label="Salvar momento"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"></path></svg></button>
+          <button class="ib ghost" aria-label="Timer de sono"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path></svg></button>
+          <button class="ib ghost" aria-label="Transcrição"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"></path></svg></button>
+          <button class="ib ghost" aria-label="Volume"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"></path></svg></button>
+        </div>
+        <button class="pbtn mo" onClick="{{toggle}}" aria-label="{{playLabel}}" style="width: 46px; height: 46px; border-radius: 16px; border: 0; background: {{accent}}; color: #1A1305; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0"><sc-if value="{{playing}}" hint-placeholder-val="{{true}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg></sc-if><sc-if value="{{paused}}" hint-placeholder-val="{{false}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg></sc-if></button>
+        <div class="mo" style="position: absolute; left: 0; bottom: 0; height: 2px; width: 62%; background: {{accent}}"></div>
+      </div>
+    </sc-if>
+
+    <nav class="tabbar" aria-label="Abas">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+        <button class="tb" onClick="{{t.go}}" style="color: {{t.fg2}}"><span class="tbi" style="background: {{t.pill}}; position: relative">
+          <sc-if value="{{t.k.home}}" hint-placeholder-val="{{false}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg></sc-if>
+          <sc-if value="{{t.k.lib}}" hint-placeholder-val="{{false}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"></rect><rect x="14" y="3" width="7" height="7" rx="2"></rect><rect x="3" y="14" width="7" height="7" rx="2"></rect><rect x="14" y="14" width="7" height="7" rx="2"></rect></svg></sc-if>
+          <sc-if value="{{t.k.disc}}" hint-placeholder-val="{{false}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m15.5 8.5-2 5-5 2 2-5z"></path></svg></sc-if>
+          <sc-if value="{{t.k.stats}}" hint-placeholder-val="{{false}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"></path></svg></sc-if>
+          <sc-if value="{{t.k.set}}" hint-placeholder-val="{{false}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg></sc-if>
+          <sc-if value="{{t.hasBadge}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: 2px; right: 12px; width: 8px; height: 8px; border-radius: 4px; background: {{accent}}"></span></sc-if>
+        </span>{{t.t}}</button>
+      </sc-for>
+    </nav>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#F5B544","options":["#F5B544","#C8F169","#4FB3BF","#B48EE0"]},"startTab":{"editor":"enum","default":"home","options":["home","lib","show","disc","stats","set","player","login"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = {
+      view: null, back: 'home', filter: 'Tudo', period: 'Semana', ptab: 'Capítulos', playing: true, speed: 1.3, dest: 'Caixa de entrada',
+      snipSaved: false, extraSnips: 0,
+      inbox: ['i1', 'i2', 'i3'], added: [],
+      fx: { silence: true, boost: true, mono: false },
+      on: { silence: true, boost: true, cont: true, wifi: true, autodl: true, delplayed: true, notif: true, wifisync: false, chap: true, trans: true, dyn: true, stats: true, carmode: true, bt: true, snipbt: true, summary: false, videobg: true, inboxDefault: true, mono: false, resume: true }
+    };
+  }
+  renderVals() {
+    const s = this.state;
+    const accent = this.props.accent ?? '#F5B544';
+    const view = s.view ?? (this.props.startTab ?? 'home');
+    const overlay = v => v === 'player' || v === 'login' || v === 'show';
+    const goto = v => () => this.setState({ view: v, back: overlay(v) ? (overlay(view) ? s.back : view) : v });
+    const go = { home: goto('home'), lib: goto('lib'), disc: goto('disc'), stats: goto('stats'), set: goto('set'), login: goto('login') };
+    const is = { home: view === 'home', lib: view === 'lib', show: view === 'show', disc: view === 'disc', stats: view === 'stats', set: view === 'set', player: view === 'player', login: view === 'login' };
+    const activeTab = view === 'show' ? 'lib' : (overlay(view) ? s.back : view);
+
+    const inboxAll = {
+      i1: { t: 'Kernel 7: o que mudou no agendador', i: 'RL', c: '#F2C14E', m: 'Rota Linux · hoje · 48 min', len: 48 },
+      i2: { t: 'O cérebro dorme em partes', i: 'CB', c: '#7BC47F', m: 'Ciência de Bolso · ontem · 26 min', len: 26 },
+      i3: { t: 'Speedruns e a física dos bugs', i: 'JS', c: '#3D8BD9', m: 'Jogo Salvo · 6 nov · 55 min', len: 55 }
+    };
+    const rm = (id, extra) => () => this.setState({ inbox: this.state.inbox.filter(x => x !== id), ...(extra || {}) });
+    const inbox = s.inbox.map(id => ({ ...inboxAll[id], queue: rm(id, { added: [...s.added, id] }), next: rm(id, { added: [id, ...s.added] }), archive: rm(id) }));
+
+    const baseQueue = [
+      { t: 'Por que o céu é azul (de verdade)', i: 'CB', c: '#7BC47F', m: 'Ciência de Bolso · 22 min', len: 22, dl: true },
+      { t: 'A rota da seda em 5 objetos', i: 'HL', c: '#E07A5F', m: 'História Lenta · 1 h 04 min', len: 64, dl: true },
+      { t: 'KPIs que mentem', i: 'CD', c: '#4FB3BF', m: 'Café com Dados · 39 min', len: 39, dl: false }
+    ];
+    const queue = [...s.added.map(id => ({ ...inboxAll[id], m: inboxAll[id].m.split(' · ')[0] + ' · ' + inboxAll[id].len + ' min', dl: false })), ...baseQueue];
+    const totalMin = queue.reduce((a, q) => a + q.len, 0);
+    const queueTotal = Math.floor(totalMin / 60) + ' h ' + String(totalMin % 60).padStart(2, '0') + ' min';
+
+    const tabsDef = [['home', 'Início'], ['lib', 'Biblioteca'], ['disc', 'Descobrir'], ['stats', 'Estatísticas'], ['set', 'Ajustes']];
+    const tabs = tabsDef.map(([k, t]) => {
+      const a = activeTab === k;
+      const badge = k === 'home' ? s.inbox.length : 0;
+      return { t, go: go[k], k: { [k]: true }, fg: a ? '#F3F4F6' : '#A1A7B3', bg: a ? '#17191F' : 'transparent', dot: a ? accent : 'transparent', fg2: a ? '#F3F4F6' : '#8C93A0', pill: a ? '#262A33' : 'transparent', hasBadge: badge > 0, badge };
+    });
+
+    const filters = ['Tudo', 'Novos · 7', 'Baixados', 'Em andamento', 'Favoritos'].map(t => { const a = t === s.filter; return { t, bg: a ? '#F3F4F6' : 'transparent', fg: a ? '#0C0D10' : '#C7CCD6', bd: a ? '#F3F4F6' : '#2A2E37', pick: () => this.setState({ filter: t }) }; });
+    const subs = [
+      { t: 'Café com Dados', i: 'CD', c: '#4FB3BF', n: 2 }, { t: 'Rota Linux', i: 'RL', c: '#F2C14E', n: 1 },
+      { t: 'História Lenta', i: 'HL', c: '#E07A5F', n: 0 }, { t: 'Ciência de Bolso', i: 'CB', c: '#7BC47F', n: 3 },
+      { t: 'Mercado em 10', i: 'M10', c: '#B48EE0', n: 0 }, { t: 'Jogo Salvo', i: 'JS', c: '#3D8BD9', n: 1 },
+      { t: 'Noite de Contos', i: 'NC', c: '#E26D9A', n: 0 }, { t: 'Código Aberto FM', i: 'CA', c: '#D98E4A', n: 0 },
+      { t: 'Mente Aberta', i: 'MA', c: '#A7B86A', n: 0 }
+    ].map(x => ({ ...x, hasNew: x.n > 0, open: goto('show') }));
+    const folders = [
+      { t: 'Tecnologia', n: 4, c: '#4FB3BF', covers: ['#4FB3BF', '#F2C14E', '#D98E4A', '#3D8BD9'] },
+      { t: 'Ciência', n: 2, c: '#7BC47F', covers: ['#7BC47F', '#A7B86A', '#1D2027', '#1D2027'] },
+      { t: 'Antes de dormir', n: 3, c: '#B48EE0', covers: ['#E26D9A', '#E07A5F', '#B48EE0', '#1D2027'] }
+    ];
+    const smart = [
+      { t: 'Curtos para o trajeto', rule: 'Menos de 25 min · não ouvidos · baixados', n: 6, c: '#4FB3BF' },
+      { t: 'Tecnologia da semana', rule: 'Pasta Tecnologia · últimos 7 dias', n: 4, c: '#F2C14E' },
+      { t: 'Começados e esquecidos', rule: 'Em andamento há mais de 14 dias', n: 3, c: '#E07A5F' }
+    ].map((p, i) => ({ ...p, line: i === 0 ? '0' : '1px solid #22252D' }));
+
+    const snipsBase = [
+      { i: 'CD', c: '#4FB3BF', p: 'Café com Dados', at: '24:12', q: 'Se ninguém toma uma decisão olhando aquele número, ele não precisa estar no painel.' },
+      { i: 'HL', c: '#E07A5F', p: 'História Lenta', at: '41:03', q: 'A seda era quase um detalhe. O que viajava de verdade eram ideias.' },
+      { i: 'RL', c: '#F2C14E', p: 'Rota Linux', at: '12:47', q: 'Leia o log antes de pesquisar o erro. Metade das respostas já está lá.' }
+    ];
+
+    const showSet = [
+      ['Velocidade', '1,5×', true], ['Cortar silêncio', 'Ligado', true], ['Realçar voz', 'Desligado', false],
+      ['Pular início', '45 s', true], ['Pular final', '30 s', true], ['Baixar automaticamente', 'Ligado', true], ['Notificar episódio novo', 'Ligado', true]
+    ].map(([t, v, hi], i) => ({ t, v, fg: hi ? accent : '#A1A7B3', line: i === 0 ? '0' : '1px solid #22252D' }));
+    const dest = ['Caixa de entrada', 'Fila', 'Arquivo'].map(t => { const a = t === s.dest; return { t, bg: a ? '#F3F4F6' : 'transparent', fg: a ? '#0C0D10' : '#C7CCD6', pick: () => this.setState({ dest: t }) }; });
+    const showEps = [
+      { d: 'Hoje', t: 'Kernel 7: o que mudou no agendador', len: '48 min', tr: true, ch: true, ring: accent },
+      { d: '1 nov', t: 'Wayland em 2026: ainda falta algo?', len: '52 min', tr: true, ch: true, ring: '#2A2E37' },
+      { d: '25 out', t: 'Dotfiles: organizando seu terminal', len: '41 min', tr: true, ch: false, ring: '#7BC47F' },
+      { d: '18 out', t: 'Btrfs, snapshots e voltar no tempo', len: '57 min', tr: false, ch: true, ring: '#2A2E37' }
+    ];
+
+    const forYou = [
+      { t: 'Gráfico Rápido', i: 'GR', c: '#E8A87C', why: 'Dados · 25 min' }, { t: 'SQL na Prática', i: 'SQL', c: '#8FB8DE', why: 'Tecnologia' },
+      { t: 'Números Contam', i: 'NC', c: '#C3A6E6', why: 'Ciência' }, { t: 'Painel Aberto', i: 'PA', c: '#9CCB86', why: 'Dados' }
+    ];
+    const epRecs = [
+      { t: 'Como escolher cores para gráficos', p: 'Gráfico Rápido', i: 'GR', c: '#E8A87C', len: '19 min' },
+      { t: 'Window functions sem medo', p: 'SQL na Prática', i: 'SQL', c: '#8FB8DE', len: '33 min' },
+      { t: 'Estatística para quem odeia estatística', p: 'Números Contam', i: 'NC', c: '#C3A6E6', len: '44 min' }
+    ];
+    const cats = [['Tecnologia', '#4FB3BF'], ['Ciência', '#7BC47F'], ['História', '#E07A5F'], ['Negócios', '#B48EE0'], ['Games', '#3D8BD9'], ['Comédia', '#F2C14E'], ['Ficção', '#E26D9A'], ['Notícias', '#A1A7B3']].map(([t, c]) => ({ t, c }));
+    const top = [
+      { n: 1, t: 'Terminal Diário', i: 'TD', c: '#8FB8DE', m: 'Diário · 15 min' }, { n: 2, t: 'Futuro Próximo', i: 'FP', c: '#7BC47F', m: 'Semanal · IA e sociedade' },
+      { n: 3, t: 'Pixel a Pixel', i: 'PP', c: '#E26D9A', m: 'Semanal · design' }, { n: 4, t: 'Open Source Brasil', i: 'OS', c: '#F2C14E', m: 'Quinzenal · entrevistas' }
+    ];
+    const podroll = [{ t: 'Terminal Diário', i: 'TD', c: '#8FB8DE', via: 'Rota Linux' }, { t: 'Gráfico Rápido', i: 'GR', c: '#E8A87C', via: 'Café com Dados' }, { t: 'Tempo Profundo', i: 'TP', c: '#C9A26B', via: 'História Lenta' }];
+    const guests = [{ n: 'Ana Ribeiro', i: 'AR', c: '#4FB3BF', eps: '5 episódios' }, { n: 'Davi Souza', i: 'DS', c: '#E07A5F', eps: '3 episódios' }, { n: 'Júlia Prado', i: 'JP', c: '#7BC47F', eps: '4 episódios' }];
+
+    const data = {
+      'Semana': { hours: '9 h 40', delta: '+18% que a semana passada', eps: 14, saved: '1 h 52 min', streak: 12, snips: 6, shows: 7 },
+      'Mês': { hours: '38 h 15', delta: '+6% que o mês passado', eps: 57, saved: '7 h 20 min', streak: 12, snips: 21, shows: 11 },
+      'Ano': { hours: '412 h', delta: '+31% que 2025', eps: 603, saved: '79 h', streak: 41, snips: 188, shows: 34 },
+      'Tudo': { hours: '1.024 h', delta: 'desde 2023', eps: 1488, saved: '196 h', streak: 41, snips: 402, shows: 61 }
+    };
+    const periods = Object.keys(data).map(t => { const a = t === s.period; return { t, bg: a ? '#F3F4F6' : 'transparent', fg: a ? '#0C0D10' : '#C7CCD6', pick: () => this.setState({ period: t }) }; });
+    const lv = ['#1A1D23', '#3A3020', '#6E5428', '#B08236'];
+    const pattern = [
+      [0,0,0,1,1,0,0,1,0,1,2,1], [0,0,0,2,1,0,0,0,1,1,2,0], [0,0,0,1,0,0,1,0,0,2,1,0], [0,0,0,2,1,0,0,1,0,1,3,1],
+      [0,0,0,1,1,0,0,0,1,2,2,1], [0,0,0,0,0,1,1,1,0,1,1,0], [1,0,0,0,0,1,2,1,1,2,3,2]
+    ];
+    const heat = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((d, i) => ({ d, cells: pattern[i].map(v => ({ bg: v === 3 ? accent : lv[v] })) }));
+    const shows = [
+      { t: 'Café com Dados', i: 'CD', c: '#4FB3BF', h: '3 h 10', w: '100%' }, { t: 'Rota Linux', i: 'RL', c: '#F2C14E', h: '2 h 25', w: '76%' },
+      { t: 'Ciência de Bolso', i: 'CB', c: '#7BC47F', h: '1 h 50', w: '58%' }, { t: 'História Lenta', i: 'HL', c: '#E07A5F', h: '1 h 05', w: '34%' }
+    ];
+    const people = [
+      { n: 'Ana Ribeiro', i: 'AR', c: '#4FB3BF', m: '6 episódios' }, { n: 'Marcos Lima', i: 'ML', c: '#F2C14E', m: '4 episódios' },
+      { n: 'Júlia Prado', i: 'JP', c: '#7BC47F', m: '3 episódios' }, { n: 'Davi Souza', i: 'DS', c: '#E07A5F', m: 'convidado · 2' }
+    ];
+
+    const T = (k, t, sub) => ({ k, t, sub, toggle: true });
+    const V = (t, val, sub) => ({ t, val, sub, toggle: false });
+    const raw = [
+      { t: 'Reprodução', rows: [V('Velocidade padrão', '1,3×', 'Cada podcast pode ter a sua'), V('Pular para trás / frente', '15 s / 30 s'), T('silence', 'Cortar silêncio', 'Encurta pausas sem distorcer a voz'), T('boost', 'Realçar voz', 'Equaliza o volume de quem fala baixo'), T('mono', 'Misturar em mono', 'Bom para fone de um lado só'), T('cont', 'Reprodução contínua', 'Toca o próximo da fila ao terminar'), T('resume', 'Voltar 5 s ao retomar', 'Depois de pausas longas'), V('Timer de sono', 'Fim do episódio', 'Sacudir o celular adiciona +5 min')] },
+      { t: 'Caixa de entrada e fila', rows: [T('inboxDefault', 'Usar caixa de entrada', 'Episódios novos esperam sua decisão'), V('Podcasts que vão direto para a fila', '3 podcasts'), V('Arquivar automaticamente', 'Após 14 dias'), V('Marcar como ouvido', 'Faltando 30 s'), V('Ao terminar a fila', 'Tocar playlist “Curtos”')] },
+      { t: 'Momentos e notas', rows: [T('snipbt', 'Salvar momento pelo fone', 'Toque 3 vezes no fone'), V('Duração do momento', '60 s antes'), V('Exportar momentos', 'Markdown · Obsidian')] },
+      { t: 'Transcrições e resumos', rows: [T('trans', 'Baixar transcrições do feed'), V('Gerar transcrição no aparelho', 'Só no Wi-Fi'), T('summary', 'Resumo do episódio com IA', 'Opcional, processado no aparelho'), T('chap', 'Mostrar capítulos')] },
+      { t: 'Downloads e armazenamento', rows: [T('autodl', 'Baixar episódios novos', 'Dos podcasts marcados'), T('wifi', 'Somente no Wi-Fi'), T('delplayed', 'Apagar depois de ouvido'), V('Manter por podcast', 'Últimos 3'), V('Limite de espaço', '5 GB · usando 3,2')] },
+      { t: 'Vídeo', rows: [T('videobg', 'Só áudio em segundo plano', 'Economiza bateria e dados'), V('Qualidade do vídeo', 'Automática')] },
+      { t: 'Biblioteca e feeds', rows: [V('Atualizar feeds', 'A cada 2 h'), V('Importar OPML', 'De outro app'), V('Exportar OPML', 'Backup das inscrições'), V('Feeds com senha', '1 podcast')] },
+      { t: 'Sincronização', rows: [V('Conta', 'Google Drive', 'Inscrições, fila, progresso, momentos e estatísticas'), T('wifisync', 'Sincronizar só no Wi-Fi'), V('Backup local', 'Toda semana')] },
+      { t: 'Notificações', rows: [T('notif', 'Episódios novos'), V('Por podcast', '4 ativados'), V('Resumo semanal', 'Domingo à noite')] },
+      { t: 'Aparência', rows: [V('Tema', 'Escuro · automático à noite'), T('dyn', 'Cor a partir da capa', 'O player assume a cor do podcast'), V('Cor de destaque', 'Âmbar'), V('Tamanho do texto', 'Padrão'), V('Aba inicial', 'Início')] },
+      { t: 'Carro, fones e atalhos', rows: [T('carmode', 'Android Auto'), V('Transmitir', 'Chromecast e DLNA'), T('bt', 'Botões do fone pulam 30 s', 'Toque duplo avança'), V('Widget na tela inicial', 'Fila + player'), V('Atalhos de teclado (PC)', 'Espaço · ← → · Ctrl K')] },
+      { t: 'Privacidade', rows: [T('stats', 'Registrar estatísticas', 'Usado pelas Estatísticas e pelas sugestões'), V('Exportar meus dados', 'JSON'), V('Apagar histórico', '')] }
+    ];
+    const groups = raw.map(g => ({ t: g.t, rows: g.rows.map((r, i) => {
+      const v = r.toggle ? !!s.on[r.k] : false;
+      return { t: r.t, sub: r.sub || '', hasSub: !!r.sub, val: r.val || '', isToggle: r.toggle, isValue: !r.toggle, on: String(v),
+        line: i === 0 ? '0' : '1px solid #22252D', track: v ? accent : '#343841', knob: v ? '#1A1305' : '#C7CCD6', align: v ? 'flex-end' : 'flex-start',
+        flip: () => this.setState({ on: { ...this.state.on, [r.k]: !v } }) };
+    }) }));
+
+    const chDef = [['00:00', 'Abertura e notícias', 9, '8 min'], ['08:35', 'Quem vai usar o painel?', 11, '11 min'], ['19:40', 'Escolhendo o gráfico certo', 17, '17 min'], ['36:50', 'Menos é mais: cortar métricas', 6, '6 min'], ['42:30', 'Perguntas dos ouvintes', 4, '4 min'], ['46:10', 'Encerramento', 2, '2 min']];
+    const chSeg = chDef.map((c, i) => ({ flex: c[2], bg: i < 2 ? accent : (i === 2 ? accent : '#2A3D3E'), h: i === 2 ? '10px' : '6px' }));
+    const chapters = chDef.map(([at, t, , len], i) => ({ at, t, len, fg: i === 2 ? accent : '#E6EEEE', w: i === 2 ? 600 : 400 }));
+    const speeds = [1, 1.2, 1.3, 1.5, 1.8, 2];
+    const tools = [['silence', 'Cortar silêncio'], ['boost', 'Realçar voz'], ['mono', 'Mono']].map(([k, label]) => {
+      const v = s.fx[k];
+      return { label, on: String(v), fg: v ? '#1A1305' : '#C7DADB', bg: v ? accent : 'transparent', border: v ? accent : '#2E5A5C', flip: () => this.setState({ fx: { ...s.fx, [k]: !v } }) };
+    });
+    const ptabs = ['Capítulos', 'Transcrição', 'Momentos', 'Notas'].map(t => { const a = t === s.ptab; return { t, fg: a ? '#F3F4F6' : '#8FB3B5', bd: a ? accent : 'transparent', pick: () => this.setState({ ptab: t }) }; });
+    const pt = { ch: s.ptab === 'Capítulos', tr: s.ptab === 'Transcrição', sn: s.ptab === 'Momentos', nt: s.ptab === 'Notas' };
+    const transcript = [
+      ['ANA', 'Então a primeira pergunta nunca é qual gráfico usar.', false],
+      ['ANA', 'É quem vai abrir esse painel na segunda de manhã, e o que essa pessoa precisa decidir.', false],
+      ['BETO', 'E quando a resposta é “todo mundo”?', true],
+      ['ANA', 'Aí ninguém usa. Um painel para todo mundo vira um painel para ninguém.', false],
+      ['BETO', 'Faz sentido. E como você corta as métricas?', false]
+    ].map(([who, t, cur]) => ({ who, t, fg: cur ? '#F3F4F6' : '#86A9AB', w: cur ? 600 : 400, size: cur ? '18px' : '15px' }));
+    const epSnips = [{ at: '24:12', q: snipsBase[0].q }, ...(s.snipSaved ? [{ at: '29:40', q: 'E quando a resposta é “todo mundo”? Aí ninguém usa.' }] : [])];
+
+    return {
+      accent, go, is, tabs, mainBg: is.player ? '#0B1D1F' : 'transparent', inbox, inboxCount: s.inbox.length, inboxEmpty: s.inbox.length === 0,
+      clearInbox: () => this.setState({ inbox: [] }),
+      queue, queueTotal, filters, subs, folders, smart, snips: snipsBase,
+      showSet, dest, showEps, forYou, epRecs, cats, top, podroll, guests,
+      periods, v: data[s.period], heat, shows, people, groups,
+      chSeg, chapters, tools, ptabs, pt, transcript, epSnips,
+      snipLabel: s.snipSaved ? 'Momento salvo em 29:40' : 'Salvar este momento',
+      saveSnip: () => this.setState({ snipSaved: true }),
+      syncs: ['Inscrições, pastas e playlists', 'Fila e ponto onde parou', 'Momentos salvos e notas', 'Estatísticas e seus ajustes'],
+      showBar: !is.player && !is.login,
+      playing: s.playing, paused: !s.playing, playLabel: s.playing ? 'Pausar' : 'Tocar',
+      speed: String(s.speed).replace('.', ','),
+      toggle: () => this.setState({ playing: !s.playing }),
+      cycleSpeed: () => { const i = speeds.indexOf(s.speed); this.setState({ speed: speeds[(i + 1) % speeds.length] }); },
+      openPlayer: goto('player'),
+      closePlayer: () => this.setState({ view: s.back })
+    };
+  }
+}
+</script>
+</body>
+</html>

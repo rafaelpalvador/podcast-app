@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Podcast — Widgets e atalhos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+p,h1,h2{margin:0}
+.w{background:#1C1A24;border-radius:26px;box-sizing:border-box;color:#F3F4F6;overflow:hidden;position:relative}
+.lb{font:600 11px Geist,sans-serif;letter-spacing:0.08em;text-transform:uppercase;color:#A1A7B3}
+.mut{color:#A6A3B0}
+.it{display:flex;flex-direction:column;gap:10px}
+.pb{border:0;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#1A1305}
+.mi{display:flex;align-items:center;gap:14px;height:48px;padding:0 16px;font-size:14px;color:#F3F4F6}
+</style>
+</helmet>
+<div style="width: 1160px; min-height: 1000px; box-sizing: border-box; padding: 48px; background: #0C0D10; color: #F3F4F6; font-family: Geist, sans-serif; display: flex; flex-direction: column; gap: 44px">
+
+  <div style="display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap">
+    <div class="it"><span class="lb">2×1 · mini player</span>
+      <div class="w" style="width: 170px; height: 78px; padding: 10px; display: flex; align-items: center; gap: 10px">
+        <span style="width: 56px; height: 56px; border-radius: 14px; background: #4FB3BF; flex-shrink: 0"></span>
+        <span style="flex: 1; min-width: 0; font-size: 12px; font-weight: 600; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical">Dashboards que as pessoas usam</span>
+        <button class="pb" aria-label="Pausar" style="width: 36px; height: 36px; border-radius: 12px; background: {{accent}}; flex-shrink: 0"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg></button>
+      </div>
+    </div>
+    <div class="it"><span class="lb">2×2 · capa</span>
+      <div class="w" style="width: 170px; height: 170px; background: #4FB3BF; color: #0C0D10; padding: 14px; display: flex; flex-direction: column">
+        <span style="position: absolute; right: -40px; top: -40px; width: 130px; height: 130px; border-radius: 50%; background: #0C0D10; opacity: 0.15"></span>
+        <span style="font: 700 22px Geist, sans-serif; letter-spacing: -0.03em">CD</span>
+        <span style="margin-top: auto; font: 600 12px Geist, sans-serif; line-height: 1.25; max-width: 100px">Faltam 18 min</span>
+        <button class="pb" aria-label="Pausar" style="position: absolute; right: 12px; bottom: 12px; width: 48px; height: 48px; border-radius: 16px; background: #0C0D10; color: #F3F4F6"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg></button>
+        <div style="position: absolute; left: 0; bottom: 0; height: 4px; width: 62%; background: #0C0D10"></div>
+      </div>
+    </div>
+    <div class="it"><span class="lb">4×2 · player completo</span>
+      <div class="w" style="width: 354px; height: 170px; padding: 14px; display: flex; gap: 14px">
+        <span style="width: 142px; height: 142px; border-radius: 18px; background: #4FB3BF; flex-shrink: 0"></span>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+          <span class="mut" style="font-size: 11px">Café com Dados · cap. 3</span>
+          <span style="font: 600 15px Geist, sans-serif; line-height: 1.25">Dashboards que as pessoas realmente usam</span>
+          <div style="display: flex; gap: 2px; margin-top: auto"><span style="flex: 20; height: 4px; border-radius: 2px; background: {{accent}}"></span><span style="flex: 29; height: 4px; border-radius: 2px; background: #4A4556"></span></div>
+          <div style="display: flex; align-items: center; justify-content: space-between; font: 700 11px Geist, sans-serif"><span>−15</span><button class="pb" aria-label="Pausar" style="width: 46px; height: 46px; border-radius: 16px; background: {{accent}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg></button><span>+30</span><span>1,3×</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="it"><span class="lb">2×2 · estatísticas</span>
+      <div class="w" style="width: 170px; height: 170px; padding: 14px; display: flex; flex-direction: column; gap: 4px">
+        <span class="mut" style="font-size: 12px">Esta semana</span>
+        <span style="font: 700 30px Geist, sans-serif; letter-spacing: -0.04em">9 h 40</span>
+        <span style="font-size: 11px; color: #7BC47F">12 dias seguidos</span>
+        <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; align-items: end; height: 48px; margin-top: auto"><span style="height: 44%; border-radius: 3px; background: #4A4556"></span><span style="height: 67%; border-radius: 3px; background: #4A4556"></span><span style="height: 34%; border-radius: 3px; background: #4A4556"></span><span style="height: 85%; border-radius: 3px; background: #4A4556"></span><span style="height: 60%; border-radius: 3px; background: #4A4556"></span><span style="height: 21%; border-radius: 3px; background: #4A4556"></span><span style="height: 100%; border-radius: 3px; background: {{accent}}"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap">
+    <div class="it"><span class="lb">4×4 · fila e caixa de entrada</span>
+      <div class="w" style="width: 354px; height: 354px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; gap: 6px; padding: 4px; border-radius: 18px; background: #2A2733"><span style="flex: 1; height: 30px; border-radius: 15px; background: #F3F4F6; color: #0C0D10; font: 600 12px Geist, sans-serif; display: flex; align-items: center; justify-content: center">Fila · 2 h 05</span><span style="flex: 1; height: 30px; border-radius: 15px; font: 600 12px Geist, sans-serif; display: flex; align-items: center; justify-content: center; color: #C9C6D2">Caixa de entrada · 3</span></div>
+        <sc-for list="{{queue}}" as="q" hint-placeholder-count="4">
+          <div style="display: flex; gap: 12px; align-items: center">
+            <span style="width: 44px; height: 44px; border-radius: 12px; background: {{q.c}}; flex-shrink: 0"></span>
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{q.t}}</span><span class="mut" style="font-size: 11px">{{q.m}}</span></span>
+            <button class="pb" aria-label="Tocar {{q.t}}" style="width: 36px; height: 36px; border-radius: 18px; background: #2C2935; color: #F3F4F6"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg></button>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 28px">
+      <div class="it"><span class="lb">4×1 · salvar momento</span>
+        <div class="w" style="width: 354px; height: 78px; padding: 12px 12px 12px 18px; display: flex; align-items: center; gap: 12px">
+          <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 600">Ouviu algo bom?</span><span class="mut" style="font-size: 11px">Salva os últimos 60 s com a transcrição</span></span>
+          <button class="pb" style="height: 48px; padding: 0 16px; border-radius: 24px; background: {{accent}}; gap: 8px; font: 600 13px Geist, sans-serif"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"></path></svg>Salvar</button>
+        </div>
+      </div>
+      <div class="it"><span class="lb">4×2 · momento do dia</span>
+        <div class="w" style="width: 354px; height: 170px; padding: 18px; display: flex; flex-direction: column; gap: 10px; background: #221D14">
+          <span style="font-size: 12px; color: {{accent}}; font-weight: 600">Café com Dados · 24:12</span>
+          <p style="font: 500 17px Geist, sans-serif; line-height: 1.4; letter-spacing: -0.01em">“Se ninguém toma uma decisão olhando aquele número, ele não precisa estar no painel.”</p>
+          <span class="mut" style="font-size: 11px; margin-top: auto">Um dos seus momentos salvos, a cada dia</span>
+        </div>
+      </div>
+    </div>
+    <div class="it"><span class="lb">2×2 · próximo episódio novo</span>
+      <div class="w" style="width: 170px; height: 170px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+        <span style="width: 44px; height: 44px; border-radius: 12px; background: #F2C14E"></span>
+        <span class="mut" style="font-size: 11px">Rota Linux · hoje</span>
+        <span style="font-size: 13px; font-weight: 600; line-height: 1.3">Kernel 7: o que mudou no agendador</span>
+        <div style="display: flex; gap: 6px; margin-top: auto"><button class="pb" style="flex: 1; height: 32px; border-radius: 16px; background: {{accent}}; font: 600 12px Geist, sans-serif">+ Fila</button><button class="pb" aria-label="Arquivar" style="width: 36px; height: 32px; border-radius: 16px; background: #2C2935; color: #F3F4F6"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M6 7v12h12V7M10 11h4"></path></svg></button></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 40px; align-items: flex-start; flex-wrap: wrap">
+    <div class="it"><span class="lb">Segurar o ícone · atalhos do Android</span>
+      <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-start">
+        <div style="width: 260px; border-radius: 22px; background: #2A2733; padding: 6px 0">
+          <div class="mi"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>Continuar ouvindo</div>
+          <div class="mi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 13h4l2 3h4l2-3h4M5 5h14l1 8v6H4v-6z"></path></svg>Caixa de entrada<span style="margin-left: auto; font-size: 12px; color: {{accent}}; font-weight: 600">3</span></div>
+          <div class="mi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"></path></svg>Salvar momento</div>
+          <div class="mi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path></svg>Timer de sono · 30 min</div>
+          <div class="mi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>Buscar podcast</div>
+        </div>
+        <span class="mut" style="font-size: 12px; max-width: 260px; line-height: 1.45">Cada atalho pode ser arrastado para a tela inicial como um ícone próprio.</span>
+      </div>
+    </div>
+    <div class="it"><span class="lb">Deslizar o ícone para cima · Honor</span>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+        <div style="padding: 12px; border-radius: 30px; background: #1C1A24; display: flex; gap: 12px">
+          <svg width="58" height="58" viewBox="0 0 100 100" role="img" aria-label="Continuar ouvindo"><rect width="100" height="100" rx="30" fill="#14161B"></rect><circle cx="40" cy="50" r="21" fill="{{accent}}"></circle><path d="M35.5 41.5 L49 50 L35.5 58.5 Z" fill="#14161B"></path><path d="M65.2 30.3 A32 32 0 0 1 65.2 69.7" fill="none" stroke="{{accent}}" stroke-width="7" stroke-linecap="round"></path><path d="M77.3 26.7 A44 44 0 0 1 77.3 73.3" fill="none" stroke="{{accent}}" stroke-width="7" stroke-linecap="round" opacity="0.5"></path></svg>
+          <span style="width: 58px; height: 58px; border-radius: 29px; background: {{accent}}; color: #1A1305; display: flex; align-items: center; justify-content: center" role="img" aria-label="Caixa de entrada"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M4 13h4l2 3h4l2-3h4M5 5h14l1 8v6H4v-6z"></path></svg></span>
+          <span style="width: 58px; height: 58px; border-radius: 29px; background: {{accent}}; color: #1A1305; display: flex; align-items: center; justify-content: center" role="img" aria-label="Salvar momento"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"></path></svg></span>
+          <span style="width: 58px; height: 58px; border-radius: 29px; background: {{accent}}; color: #1A1305; display: flex; align-items: center; justify-content: center" role="img" aria-label="Buscar"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></span>
+        </div>
+        <span style="font-size: 14px">Podcast</span>
+        <span class="mut" style="font-size: 12px; max-width: 300px; text-align: center; line-height: 1.45">Os mesmos atalhos, no formato de cartão grande do Honor.</span>
+      </div>
+    </div>
+    <div class="it"><span class="lb">Windows 11 · barra de tarefas</span>
+      <div style="width: 280px; border-radius: 12px; background: #2B2B2B; border: 1px solid #3A3A3A; padding: 8px 0; font: 400 13px 'Segoe UI', Geist, sans-serif">
+        <div style="padding: 6px 16px; font-size: 12px; color: #A0A0A0">Tarefas</div>
+        <div style="padding: 8px 16px">▶  Continuar: Café com Dados</div>
+        <div style="padding: 8px 16px">Caixa de entrada (3)</div>
+        <div style="padding: 8px 16px">Salvar momento   Ctrl+Shift+S</div>
+        <div style="padding: 8px 16px">Mini player sempre visível</div>
+        <div style="height: 1px; background: #3A3A3A; margin: 6px 0"></div>
+        <div style="padding: 8px 16px; display: flex; align-items: center; gap: 10px"><svg width="16" height="16" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="23" fill="#14161B"></rect><circle cx="42" cy="50" r="26" fill="{{accent}}"></circle><path d="M36 38 L54 50 L36 62 Z" fill="#14161B"></path></svg>Podcast</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#F5B544","options":["#F5B544","#C8F169","#4FB3BF","#B48EE0"]},"$preview":{"width":1160,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      accent: this.props.accent ?? '#F5B544',
+      queue: [
+        { t: 'Por que o céu é azul (de verdade)', m: 'Ciência de Bolso · 22 min', c: '#7BC47F' },
+        { t: 'A rota da seda em 5 objetos', m: 'História Lenta · 1 h 04', c: '#E07A5F' },
+        { t: 'KPIs que mentem', m: 'Café com Dados · 39 min', c: '#4FB3BF' },
+        { t: 'Kernel 7: o que mudou no agendador', m: 'Rota Linux · 48 min', c: '#F2C14E' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

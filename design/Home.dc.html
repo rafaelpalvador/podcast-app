@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Podcast — Tela inicial</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+p,h1,h2{margin:0}
+.w{background:#1C1A24;border-radius:26px;box-sizing:border-box;color:#F3F4F6;overflow:hidden;position:relative}
+.qa{width:58px;height:58px;border-radius:29px;border:0;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#1A1305}
+.mut{color:#A6A3B0}
+.dk{width:62px;height:62px;border-radius:18px;background:#E9E7EE;display:flex;align-items:center;justify-content:center;color:#3A3742}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #0B1218; font-family: Geist, sans-serif; color: #F3F4F6">
+  <div aria-hidden="true" style="position: absolute; left: -120px; top: -80px; width: 420px; height: 420px; border-radius: 50%; background: #16313F; opacity: 0.7"></div>
+  <div aria-hidden="true" style="position: absolute; right: -160px; bottom: 60px; width: 460px; height: 460px; border-radius: 50%; background: #3A1A14; opacity: 0.75"></div>
+  <div aria-hidden="true" style="position: absolute; left: 60px; top: 380px; width: 220px; height: 220px; border-radius: 50%; background: #0B1218; opacity: 0.8"></div>
+
+  <div style="position: relative; padding: 64px 18px 0; display: flex; flex-direction: column; gap: 14px">
+
+    <div class="w" style="height: 168px; padding: 14px; display: flex; gap: 14px">
+      <button onClick="{{openApp}}" aria-label="Abrir o player" style="width: 140px; height: 140px; border-radius: 18px; border: 0; padding: 0; background: #4FB3BF; flex-shrink: 0; position: relative; overflow: hidden; display: flex; align-items: flex-end; cursor: pointer"><span style="font: 700 24px Geist, sans-serif; color: #0C0D10; padding: 12px; letter-spacing: -0.03em">CD</span><span style="position: absolute; right: -30px; top: -30px; width: 100px; height: 100px; border-radius: 50%; background: #0C0D10; opacity: 0.16"></span></button>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+        <div style="display: flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 100 100" aria-hidden="true"><circle cx="40" cy="50" r="22" fill="{{accent}}"></circle><path d="M66 30 A32 32 0 0 1 66 70" fill="none" stroke="{{accent}}" stroke-width="10" stroke-linecap="round"></path></svg><span class="mut" style="font-size: 11px">Café com Dados · cap. 3</span></div>
+        <span style="font: 600 15px Geist, sans-serif; line-height: 1.25; letter-spacing: -0.02em">Dashboards que as pessoas realmente usam</span>
+        <div style="display: flex; gap: 2px; margin-top: auto"><span style="flex: 9; height: 4px; border-radius: 2px; background: {{accent}}"></span><span style="flex: 11; height: 4px; border-radius: 2px; background: {{accent}}"></span><span style="flex: 17; height: 4px; border-radius: 2px; background: #4A4556"></span><span style="flex: 12; height: 4px; border-radius: 2px; background: #4A4556"></span></div>
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <button aria-label="Voltar 15 segundos" style="width: 40px; height: 40px; border-radius: 20px; border: 0; background: transparent; color: #F3F4F6; font: 700 11px Geist, sans-serif; cursor: pointer">−15</button>
+          <button onClick="{{toggle}}" aria-label="{{playLabel}}" style="width: 48px; height: 48px; border-radius: 16px; border: 0; background: {{accent}}; color: #1A1305; display: flex; align-items: center; justify-content: center; cursor: pointer">
+            <sc-if value="{{playing}}" hint-placeholder-val="{{true}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg></sc-if>
+            <sc-if value="{{paused}}" hint-placeholder-val="{{false}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg></sc-if>
+          </button>
+          <button aria-label="Avançar 30 segundos" style="width: 40px; height: 40px; border-radius: 20px; border: 0; background: transparent; color: #F3F4F6; font: 700 11px Geist, sans-serif; cursor: pointer">+30</button>
+          <button onClick="{{snip}}" aria-label="Salvar momento" style="width: 40px; height: 40px; border-radius: 20px; border: 0; background: {{snipBg}}; color: {{snipFg}}; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"></path></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 14px">
+      <div class="w" style="width: 170px; height: 170px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; justify-content: space-between; align-items: center"><span style="font: 600 13px Geist, sans-serif">Caixa de entrada</span><span style="min-width: 22px; height: 22px; border-radius: 11px; background: {{accent}}; color: #1A1305; font: 700 11px Geist, sans-serif; display: flex; align-items: center; justify-content: center">3</span></div>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 2px">
+          <div style="display: flex; gap: 8px; align-items: center"><span style="width: 30px; height: 30px; border-radius: 8px; background: #F2C14E; flex-shrink: 0"></span><span style="font-size: 12px; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical">Kernel 7: o que mudou</span></div>
+          <div style="display: flex; gap: 8px; align-items: center"><span style="width: 30px; height: 30px; border-radius: 8px; background: #7BC47F; flex-shrink: 0"></span><span style="font-size: 12px; line-height: 1.25">O cérebro dorme em partes</span></div>
+        </div>
+        <span class="mut" style="font-size: 11px; margin-top: auto">+1 · toque para triar</span>
+      </div>
+      <div class="w" style="width: 170px; height: 170px; padding: 14px; display: flex; flex-direction: column; gap: 4px">
+        <span class="mut" style="font-size: 12px">Esta semana</span>
+        <span style="font: 700 30px Geist, sans-serif; letter-spacing: -0.04em">9 h 40</span>
+        <span style="font-size: 11px; color: #7BC47F">1 h 52 economizadas</span>
+        <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; align-items: end; height: 48px; margin-top: auto">
+          <span style="height: 44%; border-radius: 3px; background: #4A4556"></span><span style="height: 67%; border-radius: 3px; background: #4A4556"></span><span style="height: 34%; border-radius: 3px; background: #4A4556"></span><span style="height: 85%; border-radius: 3px; background: #4A4556"></span><span style="height: 60%; border-radius: 3px; background: #4A4556"></span><span style="height: 21%; border-radius: 3px; background: #4A4556"></span><span style="height: 100%; border-radius: 3px; background: {{accent}}"></span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 22px; padding: 10px 10px 0; align-items: flex-start">
+      <div style="width: 74px; display: flex; flex-direction: column; align-items: center; gap: 8px">
+        <span style="width: 64px; height: 64px; border-radius: 18px; background: #C9A26B"></span><span style="font-size: 13px">Leitura</span>
+      </div>
+      <sc-if value="{{closed}}" hint-placeholder-val="{{false}}">
+        <button onClick="{{expand}}" aria-label="Podcast: tocar para abrir acessos rápidos" style="width: 74px; background: none; border: 0; padding: 0; color: #F3F4F6; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer">
+          <svg width="64" height="64" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="23" fill="#14161B"></rect><circle cx="40" cy="50" r="21" fill="{{accent}}"></circle><path d="M35.5 41.5 L49 50 L35.5 58.5 Z" fill="#14161B" stroke="#14161B" stroke-width="2.5" stroke-linejoin="round"></path><path d="M65.2 30.3 A32 32 0 0 1 65.2 69.7" fill="none" stroke="{{accent}}" stroke-width="7" stroke-linecap="round"></path><path d="M77.3 26.7 A44 44 0 0 1 77.3 73.3" fill="none" stroke="{{accent}}" stroke-width="7" stroke-linecap="round" opacity="0.5"></path></svg>
+          <span style="font: 400 13px Geist, sans-serif">Podcast</span>
+        </button>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{open}}" hint-placeholder-val="{{true}}">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px">
+        <div style="padding: 12px; border-radius: 30px; background: #1C1A24; display: flex; gap: 12px">
+          <sc-for list="{{actions}}" as="a" hint-placeholder-count="4">
+            <button class="qa" aria-label="{{a.t}}" style="background: {{a.bg}}">
+              <sc-if value="{{a.k.logo}}" hint-placeholder-val="{{false}}"><svg width="58" height="58" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="30" fill="#14161B"></rect><circle cx="40" cy="50" r="21" fill="{{accent}}"></circle><path d="M35.5 41.5 L49 50 L35.5 58.5 Z" fill="#14161B"></path><path d="M65.2 30.3 A32 32 0 0 1 65.2 69.7" fill="none" stroke="{{accent}}" stroke-width="7" stroke-linecap="round"></path><path d="M77.3 26.7 A44 44 0 0 1 77.3 73.3" fill="none" stroke="{{accent}}" stroke-width="7" stroke-linecap="round" opacity="0.5"></path></svg></sc-if>
+              <sc-if value="{{a.k.inbox}}" hint-placeholder-val="{{false}}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13h4l2 3h4l2-3h4M5 5h14l1 8v6H4v-6z"></path></svg></sc-if>
+              <sc-if value="{{a.k.snip}}" hint-placeholder-val="{{false}}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"></path></svg></sc-if>
+              <sc-if value="{{a.k.search}}" hint-placeholder-val="{{false}}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></sc-if>
+            </button>
+          </sc-for>
+        </div>
+        <button onClick="{{collapse}}" style="background: none; border: 0; color: #F3F4F6; font: 400 14px Geist, sans-serif; cursor: pointer; height: 32px">Podcast</button>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="position: absolute; left: 14px; right: 14px; bottom: 18px; height: 92px; border-radius: 30px; background: #24161A; display: flex; align-items: center; justify-content: space-around">
+    <span class="dk" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"></path></svg></span>
+    <span class="dk" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"></path></svg></span>
+    <span class="dk" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><path d="M8 12h8M12 8v8"></path></svg></span>
+    <span class="dk" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg></span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#F5B544","options":["#F5B544","#C8F169","#4FB3BF","#B48EE0"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { open: true, playing: true, snipped: false }; }
+  renderVals() {
+    const accent = this.props.accent ?? '#F5B544';
+    const s = this.state;
+    const actions = [
+      { k: { logo: true }, t: 'Continuar ouvindo', bg: 'transparent' },
+      { k: { inbox: true }, t: 'Caixa de entrada', bg: accent },
+      { k: { snip: true }, t: 'Salvar momento', bg: accent },
+      { k: { search: true }, t: 'Buscar podcast', bg: accent }
+    ];
+    return {
+      accent, actions, open: s.open, closed: !s.open,
+      expand: () => this.setState({ open: true }), collapse: () => this.setState({ open: false }),
+      playing: s.playing, paused: !s.playing, playLabel: s.playing ? 'Pausar' : 'Tocar',
+      toggle: () => this.setState({ playing: !s.playing }),
+      openApp: () => {},
+      snip: () => this.setState({ snipped: !s.snipped }),
+      snipBg: s.snipped ? accent : '#2C2935', snipFg: s.snipped ? '#1A1305' : '#F3F4F6'
+    };
+  }
+}
+</script>
+</body>
+</html>
