@@ -133,7 +133,8 @@ function parseFeed(xml) {
   return {
     title: ktext(ch, 'title'), author: ktext(ch, 'itunes:author') || ktext(ch, 'managingEditor'), image: img,
     desc: stripHtml(ktext(ch, 'description') || ktext(ch, 'itunes:summary')).slice(0, 800), cat: cat ? cat.getAttribute('text') : '',
-    link: ktext(ch, 'link'), podroll, items
+    link: ktext(ch, 'link'), podroll, items,
+    self: ktext(ch, 'itunes:new-feed-url') || ((kids(ch, 'atom:link').find(l => l.getAttribute('rel') === 'self') || { getAttribute: () => '' }).getAttribute('href') || '')
   };
 }
 const epId = (feed, key) => hash(feed) + '-' + hash(key);
@@ -155,7 +156,7 @@ function mergeItems(url, f, s) {
 const PREV = {}; // prévias de podcasts que você ainda não segue
 async function fetchFeed(url) { return parseFeed(await getText(url)); }
 async function refreshFeed(url, initial) {
-  const s = sub(url); if (!s) return 0;
+  const s = sub(url); if (!s || s.local) return 0;
   const f = await fetchFeed(url);
   Object.assign(s, { title: f.title || s.title, author: f.author || s.author, image: f.image || s.image, desc: f.desc, cat: s.cat || f.cat, podroll: f.podroll, link: f.link });
   const ids = mergeItems(url, f, s);
@@ -447,7 +448,7 @@ V.home = () => {
     <header class="row" style="gap:8px"><div style="flex:1;display:flex;flex-direction:column;gap:2px"><span class="mut" style="font-size:13px">${DIAS[d.getDay()]}, ${d.getDate()} de ${['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][d.getMonth()]}</span><h1>${greet()}</h1></div>
       <button class="ib" data-a="refresh" aria-label="Atualizar feeds">${refreshing ? '<span class="spin"></span>' : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-3M4 13a8 8 0 0 0 14.9 3M4 4v4h4M20 20v-4h-4"/></svg>'}</button>
       <button class="ib" data-a="go" data-x="disc" aria-label="Buscar">${I.search}</button></header>
-    ${!hasSubs ? `<div class="card" style="display:flex;flex-direction:column;gap:12px;padding:22px"><h2 style="font-size:22px">Comece seguindo seus podcasts</h2><p class="mut" style="line-height:1.5">Busque pelo nome, cole o link RSS ou traga suas inscrições de outro app com um arquivo OPML.</p><div class="wrapchips"><button class="btn pri" data-a="go" data-x="disc">Buscar podcasts</button><button class="btn" data-a="opmlImport">Importar OPML</button>${GD.on() ? '' : '<button class="btn" data-a="go" data-x="set">Entrar com Google</button>'}</div></div>` : ''}
+    ${!hasSubs ? `<div class="card" style="display:flex;flex-direction:column;gap:12px;padding:22px"><h2 style="font-size:22px">Comece seguindo seus podcasts</h2><p class="mut" style="line-height:1.5">Busque pelo nome, cole o link RSS ou traga suas inscrições de outro app com um arquivo OPML.</p><div class="wrapchips"><button class="btn pri" data-a="go" data-x="disc">Buscar podcasts</button><button class="btn" data-a="opmlImport">Importar XML / OPML</button>${GD.on() ? '' : '<button class="btn" data-a="go" data-x="set">Entrar com Google</button>'}</div></div>` : ''}
     ${ce ? `<button class="hero" data-a="playgo" data-x="${cont}">${cov(epImg(ce), feedTitle(ce.feed), '96px', '18px', 18)}
       <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px"><span class="lbl" style="color:#8FD8E0">Continuar</span><span class="clamp2" style="font-size:17px;font-weight:600;letter-spacing:-.02em;line-height:1.25">${esc(ce.title)}</span>
       <span style="font-size:12px;color:#A9C6C9">${esc(feedTitle(ce.feed))}${ce.dur ? ' · faltam ' + fmtD(ce.dur - posOf(cont)) : ''}</span>
@@ -701,7 +702,7 @@ V.set = () => {
     ['Biblioteca e feeds', [
       row('Atualizar ao abrir', '', sw('refreshStart', 'Atualizar ao abrir')),
       row('Atualizar agora', Object.keys(db.subs).length + ' podcasts', act('Atualizar', 'refresh')),
-      row('Importar OPML', 'Traga suas inscrições de outro app', act('Importar', 'opmlImport')),
+      row('Importar XML / OPML', 'Inscrições de outro app ou o XML (RSS) de um podcast', act('Importar', 'opmlImport')),
       row('Exportar OPML', 'Backup das inscrições', act('Exportar', 'opmlExport')),
       row('País das buscas e rankings', '', sel('country', [['br', 'Brasil'], ['pt', 'Portugal'], ['us', 'Estados Unidos']]))
     ]],
@@ -836,7 +837,7 @@ const ACT = {
   psToggle: (x, b) => { const s = sub(x); s.ps = s.ps || {}; s.ps[b.dataset.y] = !s.ps[b.dataset.y]; s.t = now(); save(); render(); },
   psDest: (x, b) => { const s = sub(x); s.ps = s.ps || {}; s.ps.dest = b.dataset.y || null; s.t = now(); save(); render(); },
   more: () => { showMore += 40; render(); },
-  addRss: () => modal(`<h2>Adicionar por link</h2><p class="mut" style="font-size:13px">Cole o endereço RSS do podcast.</p><input class="txt" id="rssurl" placeholder="https://…" inputmode="url"><div class="wrapchips"><button class="btn pri" data-a="rssGo">Abrir</button><button class="btn" data-a="close">Cancelar</button></div>`),
+  addRss: () => modal(`<h2>Adicionar por link</h2><p class="mut" style="font-size:13px">Cole o endereço RSS do podcast.</p><input class="txt" id="rssurl" placeholder="https://…" inputmode="url"><div class="wrapchips"><button class="btn pri" data-a="rssGo">Abrir</button><button class="btn" data-a="opmlImport">Importar arquivo XML</button><button class="btn" data-a="close">Cancelar</button></div>`),
   rssGo: () => { const u = $('#rssurl').value.trim(); if (!/^https?:\/\//.test(u)) { toast('Cole um link que comece com http'); return; } closeModal(); go('show', u); },
   genre: async x => { D.genre = D.genre == x ? null : +x; render(); if (D.genre) { await topChart(D.genre); render(); } },
   clearSearch: () => { D.q = ''; D.res = null; render(); },
@@ -848,8 +849,8 @@ const ACT = {
   statsClear: () => { db.stats = {}; save(); render(); toast('Estatísticas apagadas'); },
   wipe: () => modal(`<h2>Apagar todos os dados?</h2><p class="mut">Isso apaga tudo deste aparelho. Se você usa o Google Drive, os dados de lá continuam e voltam ao entrar de novo.</p><div class="wrapchips"><button class="btn pri" data-a="wipeYes">Apagar tudo</button><button class="btn" data-a="close">Cancelar</button></div>`),
   wipeYes: async () => { await ACT.dlClear(); localStorage.removeItem('pc:db'); localStorage.removeItem('pc:gd'); location.hash = ''; location.reload(); },
-  opmlImport: () => modal(`<h2>Importar OPML</h2><p class="mut" style="font-size:13px">Escolha o arquivo exportado do outro app (AntennaPod, Pocket Casts, Spotify via ferramenta, etc.) ou cole o conteúdo.</p><input type="file" accept=".opml,.xml,text/xml,text/x-opml" id="opmlfile" class="txt" style="padding:8px"><textarea class="txt" id="opmltext" placeholder="…ou cole o OPML aqui"></textarea><div class="wrapchips"><button class="btn pri" data-a="opmlGo">Importar</button><button class="btn" data-a="close">Cancelar</button></div>`),
-  opmlGo: async () => { const f = $('#opmlfile').files[0]; const text = f ? await f.text() : $('#opmltext').value; closeModal(); importOpml(text); },
+  opmlImport: () => modal(`<h2>Importar XML de podcasts</h2><p class="mut" style="font-size:13px;line-height:1.5">Aceita a <b>lista de inscrições</b> exportada de outro app (OPML / XML do AntennaPod, Pocket Casts, Podcast Addict, Apple Podcasts…) e também o <b>XML (RSS) de um podcast</b>. Pode escolher vários arquivos de uma vez ou colar o conteúdo.</p><input type="file" multiple accept=".opml,.xml,.rss,text/xml,application/xml,application/rss+xml,text/x-opml" id="opmlfile" class="txt" style="padding:8px;height:auto"><textarea class="txt" id="opmltext" placeholder="…ou cole o XML aqui"></textarea><div class="wrapchips"><button class="btn pri" data-a="opmlGo">Importar</button><button class="btn" data-a="close">Cancelar</button></div>`),
+  opmlGo: async () => { const fs = Array.from($('#opmlfile').files || []); const texts = fs.length ? await Promise.all(fs.map(f => f.text())) : [$('#opmltext').value]; closeModal(); for (const t of texts) await importXml(t); },
   opmlExport: async () => { const x = exportOpml(); const okc = await copy(x); try { const p = await inv('save_text', { name: 'podcasts.opml', text: x }); toast('Salvo em ' + p, 5000); } catch (e) { toast(okc ? 'OPML copiado' : 'Não consegui exportar: ' + e); } },
   smartPlay: x => { const p = db.smart.find(y => y.id === x); const ids = smartIds(p); if (!ids.length) return; db.queue = ids.slice(1); touch('queueT'); play(ids[0]); go('player'); },
   smartNew: () => smartEditor(null),
@@ -884,6 +885,21 @@ document.addEventListener('keydown', ev => {
 });
 
 // ---------------------------------------------------------------- OPML
+async function importXml(text) {
+  text = (text || '').trim(); if (!text) { toast('Nenhum conteúdo para importar'); return; }
+  if (/<outline[\s>]/i.test(text) && !/<channel[\s>]/i.test(text)) return importOpml(text);
+  if (!/<channel[\s>]/i.test(text)) { toast('Esse arquivo não parece um XML de podcast nem uma lista OPML', 4000); return; }
+  let f; try { f = parseFeed(text); } catch (e) { toast(e.message, 4000); return; }
+  if (f.self && /^https?:\/\//.test(f.self)) { await subscribe(f.self); return; }
+  // sem endereço online no arquivo: entra como podcast local (os episódios continuam tocando pela internet)
+  const url = 'arquivo:' + hash(f.title + (f.items[0] ? f.items[0].url : ''));
+  if (sub(url)) { toast('Esse podcast já está na biblioteca'); go('show', url); return; }
+  db.subs[url] = { url, local: true, title: f.title || 'Podcast importado', author: f.author, image: f.image, desc: f.desc, cat: f.cat, podroll: f.podroll, ps: {}, t: now(), seenAt: now(), folder: '' };
+  mergeItems(url, f, db.subs[url]);
+  db.subs[url].lastDate = Math.max(0, ...db.subs[url].eps.map(id => db.eps[id].date));
+  delete db.gone[url]; save(); go('show', url);
+  toast(f.items.length + ' episódios importados de ' + (f.title || 'arquivo XML') + ' (sem endereço online: não atualiza sozinho)', 5000);
+}
 async function importOpml(text) {
   let urls = [];
   try { const d = new DOMParser().parseFromString(text, 'text/xml'); urls = Array.from(d.getElementsByTagName('outline')).map(o => o.getAttribute('xmlUrl') || o.getAttribute('xmlurl')).filter(Boolean); } catch (e) { }
@@ -899,7 +915,7 @@ async function importOpml(text) {
 }
 function exportOpml() {
   const x = s => esc(s);
-  return '<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0"><head><title>Podcast — inscrições</title></head><body>\n' + Object.values(db.subs).map(s => `  <outline type="rss" text="${x(s.title)}" title="${x(s.title)}" xmlUrl="${x(s.url)}"/>`).join('\n') + '\n</body></opml>\n';
+  return '<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0"><head><title>Podcast — inscrições</title></head><body>\n' + Object.values(db.subs).filter(s => !s.local).map(s => `  <outline type="rss" text="${x(s.title)}" title="${x(s.title)}" xmlUrl="${x(s.url)}"/>`).join('\n') + '\n</body></opml>\n';
 }
 
 // ---------------------------------------------------------------- Google Drive (pasta privada do app)

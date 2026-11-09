@@ -26,7 +26,7 @@ Pode ser o mesmo cliente OAuth "App para computador" usado no Marginália Notes,
 
 ## O que já funciona (versão 0.1)
 
-- Busca (iTunes), seguir por link RSS, importar e exportar OPML
+- Busca (iTunes), seguir por link RSS, importar XML de podcasts (lista OPML de outro app ou o RSS de um podcast) e exportar OPML
 - Caixa de entrada, fila, pastas e playlists inteligentes
 - Player com velocidade por podcast, pular início e final, capítulos, transcrição (quando o podcast publica), timer de sono e controles na tela de bloqueio
 - Downloads para ouvir offline
