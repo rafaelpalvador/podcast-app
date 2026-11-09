@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="continuar" android:enabled="true" android:icon="@drawable/ic_sc_play" android:shortcutShortLabel="@string/sc_cont">
+        <intent android:action="android.intent.action.VIEW" android:data="podcast-app://continuar" android:targetPackage="app.rafael.podcast" android:targetClass="app.rafael.podcast.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="inbox" android:enabled="true" android:icon="@drawable/ic_sc_inbox" android:shortcutShortLabel="@string/sc_inbox">
+        <intent android:action="android.intent.action.VIEW" android:data="podcast-app://inbox" android:targetPackage="app.rafael.podcast" android:targetClass="app.rafael.podcast.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="snip" android:enabled="true" android:icon="@drawable/ic_sc_snip" android:shortcutShortLabel="@string/sc_snip">
+        <intent android:action="android.intent.action.VIEW" android:data="podcast-app://snip" android:targetPackage="app.rafael.podcast" android:targetClass="app.rafael.podcast.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="search" android:enabled="true" android:icon="@drawable/ic_sc_search" android:shortcutShortLabel="@string/sc_search">
+        <intent android:action="android.intent.action.VIEW" android:data="podcast-app://search" android:targetPackage="app.rafael.podcast" android:targetClass="app.rafael.podcast.MainActivity" />
+    </shortcut>
+</shortcuts>

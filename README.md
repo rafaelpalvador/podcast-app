@@ -34,7 +34,9 @@ Pode ser o mesmo cliente OAuth "App para computador" usado no Marginália Notes,
 - Estatísticas (quando, o que e de quem você ouviu, tempo economizado) e sugestões por categoria
 - Sincronização entre celular e PC pelo Google Drive
 
-**Ainda não:** cortar silêncio, realçar voz, widgets e atalhos da tela inicial (próximas versões).
+- **Android:** player nativo com notificação de mídia, controles na tela bloqueada, na cápsula do Honor e no fone; 3 widgets (player, mini player, semana e caixa de entrada) e atalhos ao segurar o ícone
+
+**Ainda não:** cortar silêncio e realçar voz (próximas versões).
 
 ## Design
 

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="w_desc_player">Player com capa, voltar, tocar e avançar</string>
+    <string name="w_desc_mini">Mini player</string>
+    <string name="w_desc_info">Tempo ouvindo na semana e caixa de entrada</string>
+    <string name="sc_cont">Continuar ouvindo</string>
+    <string name="sc_inbox">Caixa de entrada</string>
+    <string name="sc_snip">Salvar momento</string>
+    <string name="sc_search">Buscar podcast</string>
+</resources>

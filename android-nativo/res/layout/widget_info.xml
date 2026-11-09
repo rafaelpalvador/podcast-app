@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/widget_bg" android:orientation="vertical" android:padding="14dp">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#A6A3B0" android:textSize="12sp" android:text="Esta semana" />
+    <TextView android:id="@+id/w_week" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#F3F4F6" android:textSize="28sp" android:textStyle="bold" android:text="0 min" />
+    <TextView android:id="@+id/w_saved" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#7BC47F" android:textSize="12sp" android:maxLines="1" android:text="" />
+    <TextView android:id="@+id/w_inbox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:textColor="#F5B544" android:textSize="13sp" android:textStyle="bold" android:maxLines="1" android:text="Caixa de entrada em dia" />
+    <TextView android:id="@+id/w_next" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#C9C6D2" android:textSize="12sp" android:maxLines="2" android:ellipsize="end" android:text="" />
+</LinearLayout>

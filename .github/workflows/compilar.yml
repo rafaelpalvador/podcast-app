@@ -84,13 +84,8 @@ jobs:
         run: npx tauri android init --ci
       - name: Ícones do app
         run: npx tauri icon src-tauri/icons/icon.png
-      - name: Permissões (internet, áudio em segundo plano, notificações)
-        run: |
-          M=src-tauri/gen/android/app/src/main/AndroidManifest.xml
-          for P in INTERNET ACCESS_NETWORK_STATE WAKE_LOCK FOREGROUND_SERVICE FOREGROUND_SERVICE_MEDIA_PLAYBACK POST_NOTIFICATIONS; do
-            grep -q "android.permission.$P\"" "$M" || perl -0pi -e "s#(<manifest[^>]*>)#\$1\n    <uses-permission android:name=\"android.permission.$P\" />#" "$M"
-          done
-          grep -n "uses-permission" "$M"
+      - name: Código nativo (player de mídia, widgets e atalhos)
+        run: bash scripts/android-nativo.sh
       - name: Compilar APK (tenta de novo se a rede falhar)
         run: |
           P=src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties

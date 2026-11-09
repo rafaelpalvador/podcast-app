@@ -96,8 +96,9 @@ function save(noSync) {
   clearTimeout(saveT);
   saveT = setTimeout(() => { try { localStorage.setItem('pc:db', JSON.stringify(db)); } catch (e) { toast('Sem espaço para salvar os dados'); } }, 300);
   if (!noSync) GD.schedule();
+  if (NP) { clearTimeout(save.w); save.w = setTimeout(pushWidget, 2000); }
 }
-const touch = k => { db.lists[k] = now(); };
+const touch = k => { db.lists[k] = now(); if (k === 'queueT' && NP && db.cur) { clearTimeout(touch.q); touch.q = setTimeout(syncNativeQueue, 300); } };
 const sub = url => db.subs[url];
 const ep = id => db.eps[id];
 const subOf = id => { const e = ep(id); return e && sub(e.feed); };
@@ -226,12 +227,108 @@ function pruneDownloads(feed) {
 }
 
 // ---------------------------------------------------------------- player
-const A = $('#audio');
+// No Android, o áudio toca num player nativo (notificação, tela bloqueada, cápsula, fone e widgets).
+const NP = (window.PodNative && typeof window.PodNative.available === 'function') ? window.PodNative : null;
+class NativeAudio extends EventTarget {
+  constructor() { super(); this.st = { id: '', pos: 0, dur: 0, playing: false, speed: 1 }; setInterval(() => this.poll(), 500); window.__podEvt = () => this.poll(); }
+  poll() {
+    let s; try { s = JSON.parse(NP.state() || '{}'); } catch (e) { return; }
+    const was = this.st; this.st = Object.assign({ id: '', pos: 0, dur: 0, playing: false, speed: 1 }, s);
+    let done = []; try { done = JSON.parse(NP.takeDone() || '[]'); } catch (e) { }
+    done.forEach(onNativeDone);
+    if (s.id && s.id !== db.cur && db.eps[s.id]) onNativeSwitch(s.id);
+    if (!!s.playing !== !!was.playing) this.dispatchEvent(new Event(s.playing ? 'play' : 'pause'));
+    if (s.dur && !was.dur) this.dispatchEvent(new Event('loadedmetadata'));
+    if (s.playing || s.pos !== was.pos) this.dispatchEvent(new Event('timeupdate'));
+    if (s.error && s.error !== was.error) this.dispatchEvent(new Event('error'));
+    if (++this.n % 10 === 0 || !this.n) ingestListen();
+  }
+  get paused() { return !this.st.playing; }
+  get currentTime() { return (this.st.pos || 0) / 1000; }
+  set currentTime(v) { this.st.pos = v * 1000; NP.seekTo(v * 1000); }
+  get duration() { return (this.st.dur || 0) / 1000; }
+  get playbackRate() { return this.st.speed || 1; }
+  set playbackRate(v) { this.st.speed = v; NP.setSpeed(v); }
+  set defaultPlaybackRate(v) { }
+  get src() { return this.st.id ? 'nativo' : ''; }
+  set src(v) { }
+  play() { NP.play(); this.st.playing = true; this.dispatchEvent(new Event('play')); return Promise.resolve(); }
+  pause() { NP.pause(); this.st.playing = false; this.dispatchEvent(new Event('pause')); }
+  removeAttribute() { NP.stop(); this.st = { id: '', pos: 0, dur: 0, playing: false, speed: 1 }; }
+  load() { }
+}
+NativeAudio.prototype.n = 0;
+const A = NP ? new NativeAudio() : $('#audio');
+async function nativeItem(id) {
+  const e = ep(id); let url = e.url;
+  if (DL[id]) { try { const p = await inv('download_path', { name: fileName(e) }); if (p) url = 'file://' + p; } catch (x) { } }
+  return { id, url, title: e.title, artist: feedTitle(e.feed), art: epImg(e) };
+}
+async function syncNativeQueue() { if (!NP) return; const ids = db.set.cont ? db.queue.slice(0, 15) : []; NP.setQueue(JSON.stringify(await Promise.all(ids.map(nativeItem)))); }
+function onNativeDone(id) {
+  if (!ep(id)) return;
+  db.prog[id] = { pos: 0, dur: (ep(id).dur || 0), t: now(), done: true };
+  statDone(); if (db.set.delPlayed && DL[id]) delDownload(id, true);
+  if (db.queue.includes(id)) { db.queue = db.queue.filter(x => x !== id); db.lists.queueT = now(); }
+  if (sleep === 'end') { sleep = null; NP.pauseAtEnd(false); }
+  save(); render();
+}
+function onNativeSwitch(id) {
+  db.cur = id;
+  if (db.queue.includes(id)) { db.queue = db.queue.filter(x => x !== id); db.lists.queueT = now(); }
+  if (db.inbox.includes(id)) { db.inbox = db.inbox.filter(x => x !== id); db.lists.inboxT = now(); }
+  loadExtras(id); save(); render();
+}
+function ingestListen() {
+  if (!NP) return; let L = {}; try { L = JSON.parse(NP.takeListen() || '{}'); } catch (e) { return; }
+  if (!db.set.stats) return;
+  for (const [k, v] of Object.entries(L)) {
+    const [id, day, hour] = k.split('|'); const e = ep(id); if (!e) continue;
+    const st = db.stats[DEV] || (db.stats[DEV] = { t: 0, days: {} });
+    const dd = st.days[day] || (st.days[day] = { s: 0, m: 0, e: 0, h: Array(24).fill(0), f: {} });
+    dd.s += v[0]; dd.m += v[1]; dd.h[+hour] += v[0]; dd.f[e.feed] = (dd.f[e.feed] || 0) + v[0]; st.t = now();
+  }
+  if (Object.keys(L).length) save(true);
+}
+function pushWidget() {
+  if (!NP) return;
+  try {
+    const p0 = period; period = 'Semana'; const a = aggStats(); period = p0;
+    const nx = ep(db.inbox[0]) || ep(db.queue[0]);
+    NP.setWidgetInfo(JSON.stringify({ week: fmtH(a.s), saved: a.m > a.s ? fmtH(a.m - a.s) + ' economizadas' : '', inbox: db.inbox.length, next: nx ? nx.title : '' }));
+  } catch (e) { }
+}
+function podAction() {
+  if (!NP) return; const a = NP.takeAction(); if (!a) return;
+  closeModal();
+  if (a === 'continuar') { const id = db.cur || Object.keys(db.prog).filter(x => ep(x) && !db.prog[x].done && db.prog[x].pos > 5).sort((x, y) => db.prog[y].t - db.prog[x].t)[0]; if (id) { play(id); go('player'); } else go('home'); }
+  else if (a === 'player') go(db.cur ? 'player' : 'home');
+  else if (a === 'inbox') go('home');
+  else if (a === 'snip') { if (db.cur) { saveSnip(); go('player'); } else toast('Nada tocando para salvar'); }
+  else if (a === 'search') { go('disc'); setTimeout(() => $('#q') && $('#q').focus(), 100); }
+}
+window.__podAction = podAction;
 const X = {}; // capítulos e transcrições carregados {id:{ch:[],tr:[],loading}}
 let pendingSeek = null, sleep = null, lastSave = 0, ptab = 'ch';
 const speedFor = e => { const s = e && sub(e.feed); return (s && s.ps && s.ps.speed) || db.set.speed || 1; };
 async function play(id, at) {
   const e = ep(id); if (!e) return;
+  if (NP) {
+    if (db.cur !== id || !A.src) {
+      if (db.cur && db.cur !== id) savePos();
+      db.cur = id;
+      const pr = db.prog[id]; let start = at != null ? at : posOf(id);
+      if (at == null && db.set.resume5 && pr && pr.pos && now() - (pr.t || 0) > 60000) start = Math.max(0, start - 5);
+      const s = sub(e.feed); const intro = (s && s.ps && s.ps.intro) || 0; if (start < intro) start = intro;
+      if (db.inbox.includes(id)) { db.inbox = db.inbox.filter(x => x !== id); db.lists.inboxT = now(); }
+      if (db.queue.includes(id)) { db.queue = db.queue.filter(x => x !== id); db.lists.queueT = now(); }
+      const items = [await nativeItem(id), ...(db.set.cont ? await Promise.all(db.queue.slice(0, 15).map(nativeItem)) : [])];
+      NP.load(JSON.stringify({ items, startMs: Math.round(start * 1000), speed: speedFor(e), play: true }));
+      A.st = { id, pos: start * 1000, dur: (e.dur || 0) * 1000, playing: true, speed: speedFor(e) };
+      loadExtras(id); save();
+    } else { if (at != null) A.currentTime = at; NP.setSpeed(speedFor(e)); A.play(); }
+    render(); return;
+  }
   if (db.cur !== id || !A.src) {
     if (db.cur && db.cur !== id) savePos();
     db.cur = id;
@@ -253,8 +350,16 @@ async function play(id, at) {
 function toggle() { if (!db.cur) return; if (A.paused) play(db.cur); else A.pause(); }
 function skip(sec) { if (!db.cur) return; A.currentTime = Math.max(0, Math.min((A.duration || 1e9) - 1, A.currentTime + sec)); updBar(); }
 function savePos() { if (!db.cur || !isFinite(A.currentTime)) return; const p = db.prog[db.cur] || {}; db.prog[db.cur] = { pos: A.currentTime, dur: A.duration || p.dur || 0, t: now(), done: false }; save(); }
+let finishing = null;
 function finish() {
   const id = db.cur; if (!id) return;
+  if (NP) {
+    if (finishing === id) return; finishing = id; setTimeout(() => { if (finishing === id) finishing = null; }, 4000);
+    db.prog[id] = { pos: 0, dur: A.duration || 0, t: now(), done: true };
+    statDone(); if (db.set.delPlayed && DL[id]) delDownload(id, true);
+    if (sleep === 'end') { sleep = null; NP.pauseAtEnd(false); A.pause(); save(); render(); toast('Timer de sono: boa noite'); return; }
+    NP.next(); save(); render(); return;
+  }
   db.prog[id] = { pos: 0, dur: A.duration || 0, t: now(), done: true };
   statDone(); if (db.set.delPlayed && DL[id]) delDownload(id, true);
   if (sleep === 'end') { sleep = null; A.pause(); db.cur = null; A.removeAttribute('src'); save(); render(); toast('Timer de sono: boa noite'); return; }
@@ -274,7 +379,7 @@ A.addEventListener('play', () => { renderBar(); if (view === 'player') updPlayBt
 A.addEventListener('pause', () => { savePos(); renderBar(); if (view === 'player') updPlayBtn(); });
 A.addEventListener('error', () => { if (db.cur) toast('Erro ao carregar o áudio. Verifique a internet ou baixe o episódio.', 4000); });
 function setMedia(e) {
-  if (!('mediaSession' in navigator)) return;
+  if (NP || !('mediaSession' in navigator)) return;
   const s = sub(e.feed) || PREV[e.feed] || {};
   try {
     navigator.mediaSession.metadata = new MediaMetadata({ title: e.title, artist: s.title || '', album: s.author || '', artwork: [{ src: e.img || s.image || '', sizes: '512x512' }] });
@@ -290,7 +395,7 @@ function setMedia(e) {
 let tick = 0;
 setInterval(() => {
   if (typeof sleep === 'number' && now() >= sleep) { sleep = null; A.pause(); toast('Timer de sono: boa noite'); }
-  if (A.paused || !db.cur || !db.set.stats) return;
+  if (NP || A.paused || !db.cur || !db.set.stats) return;
   const e = ep(db.cur); if (!e) return;
   const d = new Date(), k = dayKey(d);
   const st = db.stats[DEV] || (db.stats[DEV] = { t: 0, days: {} });
@@ -720,7 +825,6 @@ V.set = () => {
     ]],
     ['Em breve', [
       row('Cortar silêncio e realçar voz', 'Precisam de processamento de áudio nativo; chegam numa próxima versão', ''),
-      row('Widgets e atalhos na tela inicial', 'Próxima versão do Android', ''),
       row('Transcrição gerada no aparelho', 'Por enquanto, só quando o podcast publica a transcrição', '')
     ]]
   ];
@@ -804,7 +908,7 @@ const ACT = {
   chap: x => { const c = (X[db.cur] || {}).ch || []; if (!c.length) return; const i = curIdx(c); const j = Math.max(0, Math.min(c.length - 1, i + (+x))); if (+x < 0 && A.currentTime - c[Math.max(i, 0)].at > 3) A.currentTime = c[Math.max(i, 0)].at; else A.currentTime = c[j].at; },
   speed: () => { const L = [0.8, 1, 1.1, 1.2, 1.3, 1.5, 1.7, 2, 2.5, 3]; const cur = A.playbackRate || 1; const n = L.find(v => v > cur + 0.001) || L[0]; A.playbackRate = n; const s = subOf(db.cur); if (s) { s.ps = s.ps || {}; s.ps.speed = n; s.t = now(); save(); } render(); toast('Velocidade ' + String(n).replace('.', ',') + '×' + (s ? ' para ' + s.title : '')); },
   sleep: () => modal(`<h2>Timer de sono</h2><div class="wrapchips">${[5, 10, 15, 30, 45, 60].map(m => `<button class="btn" data-a="sleepSet" data-x="${m}">${m} min</button>`).join('')}<button class="btn" data-a="sleepSet" data-x="end">Fim do episódio</button>${sleep ? '<button class="btn" data-a="sleepSet" data-x="off">Desligar</button>' : ''}</div><button class="btn" data-a="close">Fechar</button>`),
-  sleepSet: x => { sleep = x === 'off' ? null : x === 'end' ? 'end' : now() + x * 60000; closeModal(); render(); toast(sleep ? 'Timer de sono ligado' : 'Timer desligado'); },
+  sleepSet: x => { sleep = x === 'off' ? null : x === 'end' ? 'end' : now() + x * 60000; if (NP) { NP.pauseAtEnd(sleep === 'end'); NP.sleepIn(typeof sleep === 'number' ? x * 60000 : 0); } closeModal(); render(); toast(sleep ? 'Timer de sono ligado' : 'Timer desligado'); },
   snip: saveSnip,
   snipPlay: x => { const s = db.snips.find(y => y.id === x); if (s) { play(s.ep, Math.max(0, s.at - 20)); go('player'); } },
   snipExport: async () => { if (!db.snips.length) { toast('Nenhum momento salvo ainda'); return; } const md = snipsMarkdown(); const okc = await copy(md); try { const p = await inv('save_text', { name: 'momentos-podcast.md', text: md }); toast('Salvo em ' + p + (okc ? ' e copiado' : ''), 5000); } catch (e) { toast(okc ? 'Momentos copiados em Markdown' : 'Não consegui exportar: ' + e, 4000); } },
@@ -843,7 +947,7 @@ const ACT = {
   clearSearch: () => { D.q = ''; D.res = null; render(); },
   period: x => { period = x; render(); },
   wrapped: () => { const save0 = period; period = 'Ano'; const a = aggStats(); period = save0; const top = Object.entries(a.f).sort((x, y) => y[1] - x[1]).slice(0, 5); modal(`<span class="lbl" style="color:#C3A6E6">Retrospectiva ${new Date().getFullYear()}</span><h2 style="font-size:26px">${fmtH(a.s)} ouvindo podcasts</h2><p class="mut">${a.e} episódios concluídos · ${fmtH(Math.max(0, a.m - a.s))} economizadas · ${db.snips.length} momentos salvos</p><div style="display:flex;flex-direction:column;gap:10px">${top.map(([f, s], i) => `<div class="row"><b style="width:20px">${i + 1}</b>${cov((sub(f) || {}).image, (sub(f) || {}).title, '40px', '10px', 10)}<span style="flex:1" class="ell">${esc((sub(f) || {}).title || '')}</span><span class="mut">${fmtH(s)}</span></div>`).join('')}</div><button class="btn" data-a="close">Fechar</button>`); },
-  setToggle: x => { db.set[x] = !db.set[x]; touch('setT'); save(); render(); },
+  setToggle: x => { db.set[x] = !db.set[x]; touch('setT'); if (NP && x === 'cont') syncNativeQueue(); save(); render(); },
   accent: x => { db.set.accent = x; touch('setT'); save(); render(); },
   dlClear: async () => { for (const id of Object.keys(DL)) await delDownload(id, true); dlSize = null; render(); toast('Downloads apagados'); },
   statsClear: () => { db.stats = {}; save(); render(); toast('Estatísticas apagadas'); },
@@ -873,7 +977,7 @@ function smartEditor(p) {
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-a]'); if (!b || b.disabled) return; const f = ACT[b.dataset.a]; if (f) { ev.preventDefault(); f(b.dataset.x, b, ev); } });
 document.addEventListener('change', ev => {
   const el = ev.target; const c = el.dataset.c; if (!c) return;
-  if (c === 'set') { const k = el.dataset.k; const v = el.value; db.set[k] = isNaN(+v) || v === '' ? v : +v; touch('setT'); if (k === 'speed' && db.cur && !((subOf(db.cur) || {}).ps || {}).speed) A.playbackRate = +v; if (k === 'country') { D.top = {}; D.forYou = null; } save(); render(); }
+  if (c === 'set') { const k = el.dataset.k; const v = el.value; db.set[k] = isNaN(+v) || v === '' ? v : +v; touch('setT'); if (NP && (k === 'back' || k === 'fwd')) NP.setSkip(db.set.back * 1000, db.set.fwd * 1000); if (NP && k === 'cont') syncNativeQueue(); if (k === 'speed' && db.cur && !((subOf(db.cur) || {}).ps || {}).speed) A.playbackRate = +v; if (k === 'country') { D.top = {}; D.forYou = null; } save(); render(); }
   if (c === 'ps') { const s = sub(el.dataset.x); s.ps = s.ps || {}; s.ps[el.dataset.k] = el.value === '' ? null : +el.value; s.t = now(); if (el.dataset.k === 'speed' && db.cur && ep(db.cur).feed === s.url) A.playbackRate = speedFor(ep(db.cur)); save(); }
 });
 document.addEventListener('keydown', ev => {
@@ -1010,12 +1114,19 @@ const GD = (() => {
 })();
 
 // ---------------------------------------------------------------- início
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { savePos(); localStorage.setItem('pc:db', JSON.stringify(db)); if (GD.on()) GD.sync(false); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && NP) { A.poll(); ingestListen(); podAction(); render(); } if (document.visibilityState === 'hidden') { savePos(); localStorage.setItem('pc:db', JSON.stringify(db)); if (GD.on()) GD.sync(false); } });
 window.addEventListener('beforeunload', () => { savePos(); localStorage.setItem('pc:db', JSON.stringify(db)); });
 (async function start() {
   if (!location.hash) history.replaceState(null, '', '#/' + (db.set.tab || 'home'));
   setRoute();
-  if (db.cur && ep(db.cur)) { // prepara o último episódio sem tocar
+  if (NP) {
+    NP.setSkip(db.set.back * 1000, db.set.fwd * 1000);
+    A.poll(); ingestListen();
+    if (NP.alive()) { if (A.st.id && ep(A.st.id)) db.cur = A.st.id; }
+    else if (db.cur && ep(db.cur)) { const e = ep(db.cur); NP.load(JSON.stringify({ items: [await nativeItem(db.cur)], startMs: Math.round(posOf(db.cur) * 1000), speed: speedFor(e), play: false })); A.st = { id: db.cur, pos: posOf(db.cur) * 1000, dur: (e.dur || 0) * 1000, playing: false, speed: speedFor(e) }; }
+    if (db.cur) loadExtras(db.cur);
+    render(); podAction(); pushWidget();
+  } else if (db.cur && ep(db.cur)) { // prepara o último episódio sem tocar
     const e = ep(db.cur); A.src = e.url; pendingSeek = posOf(db.cur); setMedia(e); loadExtras(db.cur);
     if (DL[db.cur]) inv('download_path', { name: fileName(e) }).then(p => { if (p && A.paused) { A.src = T.core.convertFileSrc(p); pendingSeek = posOf(db.cur); } }).catch(() => { });
     renderBar();
