@@ -478,7 +478,7 @@ function setRoute() {
   if (view === 'disc') discLoad();
 }
 window.addEventListener('popstate', setRoute);
-const activeTab = () => view === 'show' || view === 'smart' || view === 'folder' ? 'lib' : view === 'player' ? null : view;
+const activeTab = () => view === 'chart' ? 'disc' : view === 'show' || view === 'smart' || view === 'folder' ? 'lib' : view === 'player' ? null : view;
 
 // ---------------------------------------------------------------- componentes
 function cov(img, title, size, rad, fs) {
@@ -661,9 +661,10 @@ async function loadPreview(url) {
 }
 
 // ---- descobrir
-const GENRES = [[1318, 'Tecnologia', '#4FB3BF'], [1533, 'Ciência', '#7BC47F'], [1487, 'História', '#E07A5F'], [1321, 'Negócios', '#B48EE0'], [1304, 'Educação', '#F2C14E'], [1303, 'Comédia', '#E26D9A'], [1489, 'Notícias', '#A1A7B3'], [1324, 'Sociedade e cultura', '#D98E4A'], [1488, 'True crime', '#C9A26B'], [1545, 'Esportes', '#3D8BD9'], [1512, 'Saúde e bem-estar', '#9CCB86'], [1483, 'Ficção', '#C3A6E6'], [1502, 'Lazer', '#8FB8DE']];
-const CATMAP = { 'technology': 1318, 'tecnologia': 1318, 'science': 1533, 'ciência': 1533, 'ciencia': 1533, 'history': 1487, 'história': 1487, 'historia': 1487, 'business': 1321, 'negócios': 1321, 'education': 1304, 'educação': 1304, 'comedy': 1303, 'comédia': 1303, 'news': 1489, 'notícias': 1489, 'society & culture': 1324, 'true crime': 1488, 'sports': 1545, 'esportes': 1545, 'health & fitness': 1512, 'fiction': 1483, 'leisure': 1502, 'games': 1502 };
-const D = { q: '', res: null, loading: false, genre: null, top: {}, forYou: null, fyLoading: false };
+const GENRES = [[1318, 'Tecnologia', '#4FB3BF'], [1488, 'True crime', '#C9A26B'], [1533, 'Ciência', '#7BC47F'], [1487, 'História', '#E07A5F'], [1321, 'Negócios', '#B48EE0'], [1304, 'Educação', '#F2C14E'], [1303, 'Comédia', '#E26D9A'], [1489, 'Notícias', '#A1A7B3'], [1324, 'Sociedade e cultura', '#D98E4A'], [1545, 'Esportes', '#3D8BD9'], [1512, 'Saúde e bem-estar', '#9CCB86'], [1483, 'Ficção', '#C3A6E6'], [1502, 'Lazer', '#8FB8DE'], [1310, 'Música', '#F28C6B'], [1309, 'TV e cinema', '#7FA7E8'], [1305, 'Família', '#E8B86B'], [1314, 'Religião', '#B9A88A'], [1301, 'Artes', '#D07FB0']];
+const gName = id => (GENRES.find(g => g[0] == id) || [0, 'Todas'])[1];
+const CATMAP = { 'technology': 1318, 'tecnologia': 1318, 'science': 1533, 'ciência': 1533, 'ciencia': 1533, 'history': 1487, 'história': 1487, 'historia': 1487, 'business': 1321, 'negócios': 1321, 'education': 1304, 'educação': 1304, 'comedy': 1303, 'comédia': 1303, 'news': 1489, 'notícias': 1489, 'society & culture': 1324, 'sociedade e cultura': 1324, 'true crime': 1488, 'sports': 1545, 'esportes': 1545, 'health & fitness': 1512, 'saúde e fitness': 1512, 'fiction': 1483, 'ficção': 1483, 'leisure': 1502, 'lazer': 1502, 'games': 1502, 'music': 1310, 'música': 1310, 'tv & film': 1309, 'kids & family': 1305, 'religion & spirituality': 1314, 'arts': 1301, 'artes': 1301 };
+const D = { q: '', res: null, loading: false, genre: null, top: {}, loadingTop: {} };
 async function itunesSearch(q) {
   const j = await getJSON('https://itunes.apple.com/search?media=podcast&limit=30&country=' + db.set.country + '&term=' + encodeURIComponent(q));
   return (j.results || []).filter(r => r.feedUrl).map(r => ({ feed: r.feedUrl, title: r.collectionName, author: r.artistName, image: r.artworkUrl600 || r.artworkUrl100, cat: r.primaryGenreName, gid: (r.genreIds || [])[0] }));
@@ -672,45 +673,85 @@ async function topChart(gid) {
   if (D.top[gid]) return D.top[gid];
   let list = [];
   try {
-    const j = await getJSON('https://itunes.apple.com/' + db.set.country + '/rss/toppodcasts/limit=25/genre=' + gid + '/json');
-    list = ((j.feed && j.feed.entry) || []).map(e => ({ itunesId: e.id && e.id.attributes && e.id.attributes['im:id'], title: e['im:name'] && e['im:name'].label, author: e['im:artist'] && e['im:artist'].label, image: e['im:image'] && e['im:image'][e['im:image'].length - 1].label }));
+    const j = await getJSON('https://itunes.apple.com/' + db.set.country + '/rss/toppodcasts/limit=40' + (gid ? '/genre=' + gid : '') + '/json');
+    list = ((j.feed && j.feed.entry) || []).map(e => ({ itunesId: e.id && e.id.attributes && e.id.attributes['im:id'], title: e['im:name'] && e['im:name'].label, author: e['im:artist'] && e['im:artist'].label, image: e['im:image'] && e['im:image'][e['im:image'].length - 1].label.replace(/\d+x\d+bb/, '600x600bb'), summary: e.summary && e.summary.label || '', cat: e.category && e.category.attributes && e.category.attributes.label || '' }));
   } catch (e) { }
-  if (!list.length) { try { const j = await getJSON('https://rss.applemarketingtools.com/api/v2/' + db.set.country + '/podcasts/top/25/podcasts.json'); list = ((j.feed && j.feed.results) || []).map(r => ({ itunesId: r.id, title: r.name, author: r.artistName, image: (r.artworkUrl100 || '').replace('100x100', '600x600') })); } catch (e) { } }
+  if (!list.length && !gid) { try { const j = await getJSON('https://rss.applemarketingtools.com/api/v2/' + db.set.country + '/podcasts/top/40/podcasts.json'); list = ((j.feed && j.feed.results) || []).map(r => ({ itunesId: r.id, title: r.name, author: r.artistName, image: (r.artworkUrl100 || '').replace('100x100', '600x600') })); } catch (e) { } }
   D.top[gid] = list; return list;
 }
+function loadTop(gid) { if (D.top[gid] || D.loadingTop[gid]) return; D.loadingTop[gid] = true; topChart(gid).then(() => { D.loadingTop[gid] = false; if (view === 'disc' || view === 'chart') render(); }); }
 async function feedFromItunes(id) { const j = await getJSON('https://itunes.apple.com/lookup?id=' + id); const r = (j.results || [])[0]; if (!r || !r.feedUrl) throw new Error('feed não encontrado'); return r.feedUrl; }
+function listenBy() { const L = {}; for (const dev of Object.values(db.stats)) for (const d of Object.values(dev.days || {})) for (const [f, s] of Object.entries(d.f || {})) L[f] = (L[f] || 0) + s; return L; }
+const subGenre = s => s.gid || CATMAP[(s.cat || '').toLowerCase()];
 function genreWeights() {
-  const w = {}; const subs = Object.values(db.subs);
-  const listen = {}; for (const dev of Object.values(db.stats)) for (const d of Object.values(dev.days || {})) for (const [f, s] of Object.entries(d.f || {})) listen[f] = (listen[f] || 0) + s;
-  for (const s of subs) { const g = s.gid || CATMAP[(s.cat || '').toLowerCase()]; if (!g) continue; w[g] = (w[g] || 0) + 1 + (listen[s.url] || 0) / 1800; }
-  return Object.entries(w).sort((a, b) => b[1] - a[1]);
+  const w = {}; const L = listenBy();
+  for (const s of Object.values(db.subs)) { const g = subGenre(s); if (!g) continue; w[g] = (w[g] || 0) + 1 + (L[s.url] || 0) / 1800; }
+  return Object.entries(w).sort((a, b) => b[1] - a[1]).map(x => +x[0]);
 }
-async function discLoad() {
-  if (D.forYou || D.fyLoading) return;
-  const gw = genreWeights(); if (!gw.length) return;
-  D.fyLoading = true;
-  const following = new Set(Object.values(db.subs).map(s => (s.title || '').toLowerCase()));
-  const out = [];
-  for (const [gid] of gw.slice(0, 2)) { const l = await topChart(gid); l.filter(x => !following.has((x.title || '').toLowerCase())).slice(0, 6).forEach(x => out.push(Object.assign({ why: (GENRES.find(g => g[0] == gid) || [0, ''])[1] }, x))); }
-  const top = Object.values(db.subs).map(s => [s, Object.values(db.stats).reduce((a, d) => a + Object.values(d.days || {}).reduce((b, x) => b + ((x.f || {})[s.url] || 0), 0), 0)]).sort((a, b) => b[1] - a[1])[0];
-  D.forYou = { list: out.slice(0, 8), because: top && top[1] > 0 ? top[0].title : (GENRES.find(g => g[0] == gw[0][0]) || [0, ''])[1] };
-  D.fyLoading = false; if (view === 'disc') render();
+function becauseList() { // até 2 podcasts que você mais ouve, cada um puxando a sua categoria
+  const L = listenBy(); const seen = new Set();
+  return Object.values(db.subs).filter(s => subGenre(s)).sort((a, b) => (L[b.url] || 0) - (L[a.url] || 0) || (b.lastDate || 0) - (a.lastDate || 0))
+    .filter(s => { const g = subGenre(s); if (seen.has(g)) return false; seen.add(g); return true; }).slice(0, 2);
 }
-const resultCard = r => `<div class="ep"><button class="tile" style="flex-direction:row;gap:12px;flex:1;min-width:0;align-items:center" data-a="${r.feed ? 'preview' : 'previewIt'}" data-x="${esc(r.feed || r.itunesId)}">${cov(r.image, r.title, '54px', '12px', 12)}<span class="meta"><span class="t ell" style="font-weight:600">${esc(r.title)}</span><span class="m ell">${esc([r.author, r.cat].filter(Boolean).join(' · '))}</span></span></button>${r.feed && sub(r.feed) ? '<span class="mut" style="font-size:12px">Seguindo</span>' : `<button class="ib ghost" style="border:1px solid var(--ln2)" aria-label="Seguir" data-a="${r.feed ? 'sub' : 'subIt'}" data-x="${esc(r.feed || r.itunesId)}" data-y="${r.gid || ''}">${I.plus}</button>`}</div>`;
-V.disc = () => {
-  const podroll = [...new Set(Object.values(db.subs).flatMap(s => (s.podroll || []).map(u => u + '|' + s.title)))].filter(x => !sub(x.split('|')[0])).slice(0, 6);
-  return `<div class="page">
-    <h1>Descobrir</h1>
-    <label class="search">${I.search}<span style="position:absolute;width:1px;height:1px;overflow:hidden">Buscar</span><input type="search" id="q" placeholder="Nome do podcast, pessoa, tema ou link RSS" value="${esc(D.q)}" data-k="search" enterkeyhint="search"></label>
-    ${D.loading ? '<div class="row mut"><span class="spin"></span> Buscando…</div>' : ''}
-    ${D.res ? `<section><div class="sect"><h2>Resultados</h2><button class="link" data-a="clearSearch">Limpar</button></div>${D.res.map(resultCard).join('') || '<p class="mut">Nada encontrado.</p>'}</section>` : ''}
-    ${D.forYou && D.forYou.list.length ? `<section style="border-radius:26px;background:#1A1610;border:1px solid #2B2416;padding:20px;display:flex;flex-direction:column;gap:16px"><div style="display:flex;flex-direction:column;gap:6px"><span class="lbl" style="color:var(--acc)">Para você</span><h2 style="font-size:22px">Porque você ouve ${esc(D.forYou.because)}</h2><span style="font-size:13px;color:#B7AE9C">Baseado nas categorias que você mais ouve</span></div>
-      <div class="subs">${D.forYou.list.map(r => `<button class="tile" data-a="previewIt" data-x="${esc(r.itunesId)}">${cov(r.image, r.title, '100%', '14px', 15).replace('width:100%;height:100%', 'width:100%;aspect-ratio:1')}<span class="ell" style="font-size:13px;font-weight:600">${esc(r.title)}</span><span class="ell" style="font-size:11px;color:#B7AE9C">${esc(r.why)}</span></button>`).join('')}</div></section>` : D.fyLoading ? '<div class="row mut"><span class="spin"></span> Montando sugestões…</div>' : ''}
-    <section><div class="sect"><h2>Categorias</h2></div><div class="wrapchips">${GENRES.map(([id, t, c]) => `<button class="chip ${D.genre == id ? 'on' : ''}" data-a="genre" data-x="${id}"><span style="width:8px;height:8px;border-radius:4px;background:${c}"></span>${t}</button>`).join('')}</div></section>
-    ${D.genre ? `<section><div class="sect"><h2>Em alta em ${esc((GENRES.find(g => g[0] == D.genre) || [0, ''])[1])}</h2></div>${D.top[D.genre] ? D.top[D.genre].map((r, i) => `<div class="row"><span style="width:24px;font-weight:700;font-size:16px;color:#7D8491">${i + 1}</span><div style="flex:1;min-width:0">${resultCard(r)}</div></div>`).join('') || '<p class="mut">Não consegui carregar o ranking agora.</p>' : '<div class="row mut"><span class="spin"></span> Carregando…</div>'}</section>` : ''}
-    ${podroll.length ? `<section><div class="sect"><h2>Indicados pelos criadores</h2></div><div style="display:flex;flex-direction:column;gap:8px">${podroll.map(x => { const [u, by] = x.split('|'); return `<button class="card row" style="padding:12px;border-radius:18px;color:var(--tx);text-align:left" data-a="preview" data-x="${esc(u)}"><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span class="ell" style="font-size:13px;font-weight:600">${esc(u.replace(/^https?:\/\//, ''))}</span><span class="mut" style="font-size:12px">indicado por ${esc(by)}</span></span>${I.back.replace('m15 6-6 6 6 6', 'm9 6 6 6-6 6')}</button>`; }).join('')}</div></section>` : ''}
-  </div>`;
+const isFollowing = r => r.feed ? !!sub(r.feed) : Object.values(db.subs).some(s => (s.title || '').toLowerCase() === (r.title || '').toLowerCase());
+const followBtn = (r, cls) => isFollowing(r) ? `<span class="${cls || 'dplus'} on" aria-label="Seguindo">${I.ok.replace('#7BC47F', 'currentColor')}</span>` : `<button class="${cls || 'dplus'}" aria-label="Seguir ${esc(r.title)}" data-a="${r.feed ? 'sub' : 'subIt'}" data-x="${esc(r.feed || r.itunesId)}" data-y="${r.gid || ''}">${I.plus}</button>`;
+const openAttr = r => `data-a="${r.feed ? 'preview' : 'previewIt'}" data-x="${esc(r.feed || r.itunesId)}"`;
+const resultCard = r => `<div class="ep"><button class="tile" style="flex-direction:row;gap:12px;flex:1;min-width:0;align-items:center" ${openAttr(r)}>${cov(r.image, r.title, '54px', '12px', 12)}<span class="meta"><span class="t ell" style="font-weight:600">${esc(r.title)}</span><span class="m ell">${esc([r.author, r.cat].filter(Boolean).join(' · '))}</span></span></button>${followBtn(r)}</div>`;
+const dots = (id, n) => n > 1 ? `<div class="dots" data-for="${id}">${Array.from({ length: n }, (_, i) => `<span class="${i ? '' : 'on'}"></span>`).join('')}</div>` : '';
+const sectHead = (t, more, sub2) => `<div class="dhead"><div style="min-width:0">${sub2 ? `<span class="mut" style="font-size:13px">${sub2}</span>` : ''}<h2>${t}</h2></div>${more ? `<button class="dmore" data-a="go" data-x="chart" data-y="${more}">Ver tudo</button>` : ''}</div>`;
+function featured(list, id) {
+  const it = list.slice(0, 7);
+  return `<div class="hcar snap" id="${id}">${it.map(r => `<div class="feat"><button class="feat-art" ${openAttr(r)}>${cov(r.image, r.title, '100%', '14px', 30).replace('width:100%;height:100%', 'width:100%;aspect-ratio:1')}</button>
+    <div class="feat-tx"><span class="feat-tag">Destaque</span><button class="feat-t" ${openAttr(r)}>${esc(r.title)}</button><span class="mut ell" style="font-size:14px">${esc(r.author || '')}</span>${r.summary ? `<span class="feat-s">${esc(r.summary)}</span>` : ''}</div>${followBtn(r, 'dplus feat-plus')}</div>`).join('')}</div>${dots(id, it.length)}`;
+}
+function pagedList(list, id) {
+  const pages = []; for (let i = 0; i < list.length && pages.length < 5; i += 4) pages.push(list.slice(i, i + 4));
+  return `<div class="hcar snap" id="${id}">${pages.map((p, pi) => `<div class="tpage">${p.map((r, i) => `<div class="trow"><span class="trank">${pi * 4 + i + 1}</span><button class="tile" style="flex-direction:row;gap:12px;flex:1;min-width:0;align-items:center" ${openAttr(r)}>${cov(r.image, r.title, '64px', '10px', 13)}<span class="meta"><span class="t ell" style="font-size:16px">${esc(r.title)}</span><span class="m ell" style="font-size:13px">${esc(r.author || '')}</span></span></button>${followBtn(r)}</div>`).join('')}</div>`).join('')}</div>${dots(id, pages.length)}`;
+}
+function bigCards(list) {
+  return `<div class="hcar">${list.slice(0, 12).map(r => `<div class="bcard"><button class="bart" ${openAttr(r)}>${cov(r.image, r.title, '100%', '12px', 24).replace('width:100%;height:100%', 'width:100%;aspect-ratio:1')}</button>${followBtn(r, 'dplus bplus')}<button class="bt ell" ${openAttr(r)}>${esc(r.title)}</button><span class="mut ell" style="font-size:13px">${esc(r.author || '')}</span></div>`).join('')}</div>`;
+}
+const loadingRow = '<div class="row mut" style="padding:8px 0"><span class="spin"></span> Carregando…</div>';
+V.chart = () => {
+  const gid = +arg || 0; loadTop(gid); const l = D.top[gid];
+  return `<div class="page" style="gap:18px"><button class="ib" data-a="back" aria-label="Voltar">${I.back}</button><h1>Em alta${gid ? ' em ' + esc(gName(gid)) : ''}</h1>
+    <section>${l ? l.map((r, i) => `<div class="row"><span class="trank">${i + 1}</span><div style="flex:1;min-width:0">${resultCard(r)}</div></div>`).join('') || '<p class="mut">Não consegui carregar o ranking agora.</p>' : loadingRow}</section></div>`;
 };
+V.disc = () => {
+  const g = D.genre || 0;
+  loadTop(g);
+  const quick = GENRES.slice(0, 8);
+  const head = `<div class="page dpage">
+    <label class="search">${I.search}<span style="position:absolute;width:1px;height:1px;overflow:hidden">Buscar</span><input type="search" id="q" placeholder="Buscar podcasts ou colar link RSS" value="${esc(D.q)}" data-k="search" enterkeyhint="search"></label>
+    <div class="chips"><button class="chip ${g ? 'on' : ''}" data-a="cats">${g ? esc(gName(g)) : 'Todas as categorias'} <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${g ? `<button class="chip" data-a="genre" data-x="0">Limpar</button>` : ''}${quick.filter(q => q[0] !== g).map(([id, t]) => `<button class="chip" data-a="genre" data-x="${id}">${t}</button>`).join('')}</div>`;
+  if (D.loading || D.res) return head + (D.loading ? '<div class="row mut"><span class="spin"></span> Buscando…</div>' : `<section><div class="sect"><h2>Resultados</h2><button class="link" data-a="clearSearch">Limpar</button></div>${D.res.map(resultCard).join('') || '<p class="mut">Nada encontrado.</p>'}</section>`) + '</div>';
+  const top = D.top[g];
+  let out = head;
+  out += `<section class="dband">${top ? (top.length ? featured(top, 'car-feat') : '<p class="mut">Não consegui carregar os destaques agora. Verifique a internet.</p>') : loadingRow}</section>`;
+  out += `<section>${sectHead(g ? 'Em alta em ' + esc(gName(g)) : 'Em alta', g || '0')}${top ? pagedList(top.slice(7), 'car-trend') : loadingRow}</section>`;
+  if (!g) {
+    for (const s of becauseList()) {
+      const gid = subGenre(s); loadTop(gid); const l = D.top[gid];
+      const items = l ? l.filter(r => !isFollowing(r)) : null;
+      out += `<section><div class="dhead"><div class="row" style="gap:10px;min-width:0">${cov(s.image, s.title, '44px', '8px', 10)}<div style="min-width:0"><span class="mut" style="font-size:13px">Porque você gosta de</span><h2 class="ell">${esc(s.title)}</h2></div></div><button class="dmore" data-a="go" data-x="chart" data-y="${gid}">Ver tudo</button></div>${items ? (items.length ? bigCards(items) : '<p class="mut">Você já segue os mais ouvidos dessa categoria.</p>') : loadingRow}</section>`;
+    }
+    out += `<section>${sectHead('Categorias')}<div class="hcar">${GENRES.map(([id, t, c]) => `<button class="gcirc" data-a="genre" data-x="${id}"><span style="background:${c}">${esc(initials(t))}</span><b>${t}</b></button>`).join('')}</div></section>`;
+    const extra = [...new Set([...genreWeights(), 1318, 1488, 1533])].filter(x => GENRES.some(gg => gg[0] === x)).slice(0, 3);
+    for (const gid of extra) { loadTop(gid); const l = D.top[gid]; out += `<section>${sectHead('Em alta em ' + esc(gName(gid)), String(gid))}${l ? bigCards(l) : loadingRow}</section>`; }
+    const podroll = [...new Set(Object.values(db.subs).flatMap(s => (s.podroll || []).map(u => u + '|' + s.title)))].filter(x => !sub(x.split('|')[0])).slice(0, 6);
+    if (podroll.length) out += `<section>${sectHead('Indicados pelos criadores')}<div style="display:flex;flex-direction:column;gap:8px">${podroll.map(x => { const [u, by] = x.split('|'); return `<button class="card row" style="padding:12px;border-radius:18px;color:var(--tx);text-align:left" data-a="preview" data-x="${esc(u)}"><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span class="ell" style="font-size:13px;font-weight:600">${esc(u.replace(/^https?:\/\//, ''))}</span><span class="mut" style="font-size:12px">indicado por ${esc(by)}</span></span></button>`; }).join('')}</div></section>`;
+  } else {
+    out += `<section>${sectHead('Mais em ' + esc(gName(g)))}${top ? bigCards(top.slice(27)) : loadingRow}</section>`;
+  }
+  return out + '</div>';
+};
+function discLoad() { }
+// pontinhos dos carrosséis
+document.addEventListener('scroll', ev => {
+  const c = ev.target; if (!c.classList || !c.classList.contains('snap')) return;
+  const d = document.querySelector('.dots[data-for="' + c.id + '"]'); if (!d) return;
+  const w = c.firstElementChild ? c.firstElementChild.offsetWidth : c.clientWidth; const i = Math.round(c.scrollLeft / Math.max(1, w)); d.querySelectorAll('span').forEach((s, k) => s.classList.toggle('on', k === i));
+}, true);
 async function doSearch(q) {
   q = q.trim(); D.q = q; if (!q) { D.res = null; render(); return; }
   if (/^https?:\/\//i.test(q)) { go('show', q); return; }
@@ -1002,7 +1043,8 @@ const ACT = {
   more: () => { showMore += 40; render(); },
   addRss: () => modal(`<h2>Adicionar por link</h2><p class="mut" style="font-size:13px">Cole o endereço RSS do podcast.</p><input class="txt" id="rssurl" placeholder="https://…" inputmode="url"><div class="wrapchips"><button class="btn pri" data-a="rssGo">Abrir</button><button class="btn" data-a="opmlImport">Importar arquivo XML</button><button class="btn" data-a="close">Cancelar</button></div>`),
   rssGo: () => { const u = $('#rssurl').value.trim(); if (!/^https?:\/\//.test(u)) { toast('Cole um link que comece com http'); return; } closeModal(); go('show', u); },
-  genre: async x => { D.genre = D.genre == x ? null : +x; render(); if (D.genre) { await topChart(D.genre); render(); } },
+  genre: x => { closeModal(); D.genre = +x || null; D.res = null; D.q = ''; if (view !== 'disc') go('disc'); else render(); $('#main').scrollTop = 0; },
+  cats: () => modal(`<h2>Categorias</h2><div class="wrapchips"><button class="chip ${D.genre ? '' : 'on'}" data-a="genre" data-x="0">Todas</button>${GENRES.map(([id, t, c]) => `<button class="chip ${D.genre == id ? 'on' : ''}" data-a="genre" data-x="${id}"><span style="width:8px;height:8px;border-radius:4px;background:${c}"></span>${t}</button>`).join('')}</div><button class="btn" data-a="close">Fechar</button>`),
   clearSearch: () => { D.q = ''; D.res = null; render(); },
   period: x => { period = x; render(); },
   wrapped: () => { const save0 = period; period = 'Ano'; const a = aggStats(); period = save0; const top = Object.entries(a.f).sort((x, y) => y[1] - x[1]).slice(0, 5); modal(`<span class="lbl" style="color:#C3A6E6">Retrospectiva ${new Date().getFullYear()}</span><h2 style="font-size:26px">${fmtH(a.s)} ouvindo podcasts</h2><p class="mut">${a.e} episódios concluídos · ${fmtH(Math.max(0, a.m - a.s))} economizadas · ${db.snips.length} momentos salvos</p><div style="display:flex;flex-direction:column;gap:10px">${top.map(([f, s], i) => `<div class="row"><b style="width:20px">${i + 1}</b>${cov((sub(f) || {}).image, (sub(f) || {}).title, '40px', '10px', 10)}<span style="flex:1" class="ell">${esc((sub(f) || {}).title || '')}</span><span class="mut">${fmtH(s)}</span></div>`).join('')}</div><button class="btn" data-a="close">Fechar</button>`); },
