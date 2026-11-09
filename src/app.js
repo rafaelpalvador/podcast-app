@@ -80,7 +80,7 @@ const DEF = {
     { id: 's2', name: 'Começados e esquecidos', started: true, days: 14 },
     { id: 's3', name: 'Novos da semana', unplayed: true, recent: 7 }
   ],
-  set: { speed: 1, back: 15, fwd: 30, cont: true, resume5: true, inbox: true, archDays: 14, delPlayed: true, keep: 3, refreshStart: true, stats: true, accent: '#F5B544', country: 'br', tab: 'home' }
+  set: { speed: 1, back: 15, fwd: 30, cont: true, resume5: true, inbox: true, archDays: 14, delPlayed: true, keep: 3, refreshStart: true, stats: true, accent: '#F5B544', country: 'br', tab: 'home', glass: true }
 };
 function load() {
   let j = null; try { j = JSON.parse(localStorage.getItem('pc:db') || 'null'); } catch (e) { }
@@ -91,10 +91,15 @@ function load() {
 let db = load();
 let DL = (() => { try { return JSON.parse(localStorage.getItem('pc:dl') || '{}'); } catch (e) { return {}; } })(); // downloads deste aparelho
 const saveDL = () => localStorage.setItem('pc:dl', JSON.stringify(DL));
-let saveT;
+let saveT, storeReady = false;
+function persistNow() {
+  if (!storeReady) return Promise.resolve();
+  const txt = JSON.stringify(db);
+  return inv('store_write', { name: 'dados.json', text: txt }).catch(() => { try { localStorage.setItem('pc:db', txt); } catch (e) { } });
+}
 function save(noSync) {
   clearTimeout(saveT);
-  saveT = setTimeout(() => { try { localStorage.setItem('pc:db', JSON.stringify(db)); } catch (e) { toast('Sem espaço para salvar os dados'); } }, 300);
+  saveT = setTimeout(persistNow, 600);
   if (!noSync) GD.schedule();
   if (NP) { clearTimeout(save.w); save.w = setTimeout(pushWidget, 2000); }
 }
@@ -488,7 +493,7 @@ function goAnim(v, a, fromEl) {
 function setRoute() {
   const m = location.hash.match(/^#\/([a-z]+)(?:\/(.*))?$/);
   const nv = m ? m[1] : (db.set.tab || 'home'); const na = m && m[2] != null ? decodeURIComponent(m[2]) : null;
-  const changed = nv !== view || na !== arg; if (changed) showMore = 40; view = nv; arg = na; render(); if (changed) $('#main').scrollTop = 0;
+  const changed = nv !== view || na !== arg; if (changed) { showMore = 40; if (view === 'show' || nv === 'show') { showTab = 'eps'; showQ = ''; showDesc = false; showSort = 'new'; } } view = nv; arg = na; render(); if (changed) $('#main').scrollTop = 0;
   if (view === 'disc') discLoad();
 }
 window.addEventListener('popstate', setRoute);
@@ -569,7 +574,7 @@ V.home = () => {
       <button class="ib" data-a="go" data-x="disc" aria-label="Buscar">${I.search}</button></header>
     ${!hasSubs ? `<div class="card" style="display:flex;flex-direction:column;gap:12px;padding:22px"><h2 style="font-size:22px">Comece seguindo seus podcasts</h2><p class="mut" style="line-height:1.5">Busque pelo nome, cole o link RSS ou traga suas inscrições de outro app com um arquivo OPML.</p><div class="wrapchips"><button class="btn pri" data-a="go" data-x="disc">Buscar podcasts</button><button class="btn" data-a="opmlImport">Importar XML / OPML</button>${GD.on() ? '' : '<button class="btn" data-a="go" data-x="set">Entrar com Google</button>'}</div></div>` : ''}
     ${ce ? (() => { const dd = durOf(cont), ps = cont === db.cur && A.src ? A.currentTime || posOf(cont) : posOf(cont), tc = tintOf(epImg(ce)), playing = cont === db.cur && !A.paused;
-      return `<div class="hero glass" style="${tc ? `background:linear-gradient(135deg,rgba(${tc},.55),rgba(${tc},.16) 70%,rgba(255,255,255,.03))` : ''}">
+      return `<div class="hero glass" style="${tc ? `background:linear-gradient(135deg,rgba(${tc},.42),rgba(${tc},.10) 75%,#0B0C0F)` : ''}">
       <button class="hero-open" data-a="openPlayer" data-x="${cont}" aria-label="Abrir o player">${cov(epImg(ce), feedTitle(ce.feed), '96px', '18px', 18).replace('<span class="cov"', '<span class="cov" data-vt="' + cont + '"')}
       <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px"><span class="lbl" style="color:rgba(255,255,255,.75)">${playing ? 'Tocando agora' : 'Continuar'}</span><span class="clamp2" style="font-size:17px;font-weight:600;letter-spacing:-.02em;line-height:1.25">${esc(ce.title)}</span>
       <span style="font-size:12px;color:rgba(255,255,255,.7)">${esc(feedTitle(ce.feed))}${dd ? ' · faltam ' + fmtD(dd - ps) : ''}</span>
@@ -640,34 +645,125 @@ V.smart = () => {
     <section>${ids.map(id => epRow(id)).join('') || '<div class="card empty"><span class="mut">Nenhum episódio combina com essa regra agora.</span></div>'}</section></div>`;
 };
 let showMore = 40;
+let showTab = 'eps', showQ = '', showDesc = false, showSort = 'new';
+const META = {}; // capa/título conhecidos antes de baixar o feed (busca e rankings)
+const IT2FEED = (() => { try { return JSON.parse(localStorage.getItem('pc:itfeed') || '{}'); } catch (e) { return {}; } })();
+const WD = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+function cadence(ids) {
+  const ds = ids.map(id => (ep(id) || {}).date).filter(Boolean).sort((a, b) => b - a).slice(0, 12);
+  if (ds.length < 3) return null;
+  const gaps = ds.slice(0, -1).map((d, i) => (d - ds[i + 1]) / 864e5).sort((a, b) => a - b);
+  const med = gaps[Math.floor(gaps.length / 2)];
+  const wd = {}; ds.forEach(d => { const k = new Date(d).getDay(); wd[k] = (wd[k] || 0) + 1; });
+  const [day, cnt] = Object.entries(wd).sort((a, b) => b[1] - a[1])[0];
+  const next = ds[0] + med * 864e5;
+  if (med <= 1.5) return 'Episódios quase todo dia';
+  if (now() - ds[0] > Math.max(med * 3, 45) * 864e5) return 'Sem episódios novos desde ' + fmtDate(ds[0]).toLowerCase();
+  if (med >= 5 && med <= 9 && cnt >= ds.length * 0.6) return 'Novo episódio toda ' + WD[day] + (next > now() ? ' · próximo ' + (next - now() < 7 * 864e5 ? WD[new Date(next).getDay()] : fmtDate(next)) : '');
+  if (next > now() && next - now() < 10 * 864e5) return 'Próximo episódio previsto ' + (next - now() < 864e5 ? 'amanhã' : 'na ' + WD[new Date(next).getDay()]);
+  return 'Um episódio a cada ' + Math.round(med) + ' dias, em média';
+}
+const STAR = f => `<svg width="22" height="22" viewBox="0 0 24 24" fill="${f ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>`;
+const ICO = {
+  mic: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  cal: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  list: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+  clock: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  globe: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
+  ear: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 14v-2a9 9 0 0 1 18 0v2M3 14a2 2 0 0 1 2-2h1v7H5a2 2 0 0 1-2-2zM21 14a2 2 0 0 0-2-2h-1v7h1a2 2 0 0 0 2-2z"/></svg>',
+  share: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>'
+};
+function showSkeleton(m) {
+  m = m || {};
+  return `<div class="sh">${m.image ? `<div class="sh-bg"><img src="${esc(m.image)}" alt=""></div>` : ''}<div class="sh-top"><button class="ib gl" data-a="back" aria-label="Voltar">${I.back}</button></div>
+    <div class="sh-head">${cov(m.image, m.title || '', '100%', '18px', 40).replace('width:100%;height:100%', 'width:100%;aspect-ratio:1').replace('<span class="cov"', '<span class="cov sh-art"')}
+    ${m.author ? `<span class="sh-kick">${esc(m.author)}</span>` : ''}<h1 class="sh-title">${esc(m.title || 'Carregando…')}</h1></div>
+    <div class="empty"><span class="spin"></span><span class="mut">Carregando episódios…</span></div></div>`;
+}
 V.show = () => {
-  const url = arg; const s = sub(url); const p = s || PREV[url];
-  if (p && p.image) coverTint(p.image);
-  if (!p) { loadPreview(url); return `<div class="page"><button class="ib" data-a="back" aria-label="Voltar">${I.back}</button><div class="card empty"><span class="spin"></span><span class="mut">Carregando o podcast…</span></div></div>`; }
+  let url = arg || '';
+  if (url.startsWith('it:')) {
+    const id = url.slice(3);
+    if (IT2FEED[id]) { history.replaceState(null, '', '#/show/' + encodeURIComponent(IT2FEED[id])); arg = IT2FEED[id]; url = arg; }
+    else {
+      if (!META[url] || !META[url].resolving) {
+        META[url] = Object.assign(META[url] || {}, { resolving: true });
+        feedFromItunes(id).then(f => { IT2FEED[id] = f; localStorage.setItem('pc:itfeed', JSON.stringify(IT2FEED)); META[f] = META[f] || META[url]; if (view === 'show' && arg === url) { history.replaceState(null, '', '#/show/' + encodeURIComponent(f)); arg = f; render(); } })
+          .catch(e => { toast('Não consegui abrir: ' + e.message, 4000); META[url].resolving = false; });
+      }
+      return showSkeleton(META[url]);
+    }
+  }
+  const s = sub(url); const p = s || PREV[url];
+  if (!p || p.loading) { if (!p) loadPreview(url); return showSkeleton(META[url]); }
+  if (p.image) coverTint(p.image);
   if (s && s.seenAt < now() - 1000) { s.seenAt = now(); save(true); }
-  const ids = s ? (s.eps || []) : p.ids;
+  const ids = (s ? (s.eps || []) : p.ids) || [];
   const ps = (s && s.ps) || {};
-  const speedOpts = [['', 'Padrão (' + String(db.set.speed).replace('.', ',') + '×)'], ...[0.8, 1, 1.1, 1.2, 1.3, 1.5, 1.7, 2, 2.5, 3].map(v => [v, String(v).replace('.', ',') + '×'])];
-  const secs = [0, 10, 15, 20, 30, 45, 60, 90, 120].map(v => [v, v ? v + ' s' : 'Não']);
-  const opt = (list, val) => list.map(([v, t]) => `<option value="${v}" ${String(val ?? '') === String(v) ? 'selected' : ''}>${t}</option>`).join('');
-  return `<div class="page" style="gap:24px">
-    <button class="ib" data-a="back" aria-label="Voltar">${I.back}</button>
-    <div class="show-head">${cov(p.image, p.title, '168px', '22px', 30).replace('<span class="cov"', '<span class="cov showart"')}
-      <div style="flex:1 1 240px;display:flex;flex-direction:column;gap:8px"><h1>${esc(p.title)}</h1><span class="mut">${esc([p.author, p.cat].filter(Boolean).join(' · '))}</span>
-        <div class="wrapchips" style="margin-top:6px">${s ? `<button class="btn light" data-a="unsub" data-x="${esc(url)}">Seguindo</button><button class="btn" data-a="setFolder" data-x="${esc(url)}">${s.folder ? 'Pasta: ' + esc(s.folder) : 'Pôr numa pasta'}</button><button class="btn" data-a="refreshOne" data-x="${esc(url)}">Atualizar</button>` : `<button class="btn pri" data-a="sub" data-x="${esc(url)}">Seguir</button>`}</div></div></div>
-    ${p.desc ? `<p class="mut" style="font-size:14px;line-height:1.55;max-width:760px;white-space:pre-line">${esc(p.desc)}</p>` : ''}
-    <div class="two">
-      ${s ? `<section><div class="sect"><h2>Ajustes deste podcast</h2></div><div class="setg">
+  const durs = ids.map(id => (ep(id) || {}).dur).filter(Boolean);
+  const avg = durs.length ? durs.reduce((a, b) => a + b, 0) / durs.length : 0;
+  const first = ids.length ? (ep(ids[ids.length - 1]) || {}).date : 0;
+  const cad = cadence(ids);
+  const heard = Object.values(db.stats).reduce((a, d) => a + Object.values(d.days || {}).reduce((b, x) => b + ((x.f || {})[url] || 0), 0), 0);
+  const host = (() => { try { return p.link ? new URL(p.link).hostname.replace(/^www\./, '') : ''; } catch (e) { return ''; } })();
+  const rating = (s && s.rating) || 0;
+  const tabs = [['eps', 'Episódios'], ...(s ? [['set', 'Ajustes']] : []), ['like', 'Parecidos'], ['sn', 'Momentos']];
+  if (!tabs.some(t => t[0] === showTab)) showTab = 'eps';
+  let body = '';
+  if (showTab === 'eps') {
+    let list = ids;
+    if (showQ) { const q = showQ.toLowerCase(); list = list.filter(id => ((ep(id) || {}).title || '').toLowerCase().includes(q) || ((ep(id) || {}).desc || '').toLowerCase().includes(q)); }
+    if (showSort === 'old') list = list.slice().reverse();
+    if (showSort === 'unplayed') list = list.filter(id => !isDone(id));
+    body = `<div class="row" style="gap:8px"><label class="search sm" style="flex:1">${I.search}<span style="position:absolute;width:1px;height:1px;overflow:hidden">Buscar episódios</span><input type="search" placeholder="Buscar episódios" value="${esc(showQ)}" data-k="epsearch" enterkeyhint="search"></label>
+      <select class="sel" data-c="showSort" aria-label="Ordem">${[['new', 'Mais novos'], ['old', 'Mais antigos'], ['unplayed', 'Não ouvidos']].map(([k, t]) => `<option value="${k}" ${showSort === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+      <div class="sh-eps">${list.slice(0, showMore).map(id => epRow(id, { showFeed: false })).join('') || '<p class="mut" style="padding:16px 0">Nenhum episódio encontrado.</p>'}</div>
+      ${list.length > showMore ? '<button class="btn" style="width:100%;margin-top:10px" data-a="more">Ver mais episódios</button>' : ''}`;
+  } else if (showTab === 'set') {
+    const speedOpts = [['', 'Padrão (' + String(db.set.speed).replace('.', ',') + '×)'], ...[0.8, 1, 1.1, 1.2, 1.3, 1.5, 1.7, 2, 2.5, 3].map(v => [v, String(v).replace('.', ',') + '×'])];
+    const secs = [0, 10, 15, 20, 30, 45, 60, 90, 120].map(v => [v, v ? v + ' s' : 'Não']);
+    const opt = (list, val) => list.map(([v, t]) => `<option value="${v}" ${String(val ?? '') === String(v) ? 'selected' : ''}>${t}</option>`).join('');
+    body = `<div class="setg">
         <div class="setr"><span class="tx"><b>Velocidade</b></span><select class="sel" data-c="ps" data-k="speed" data-x="${esc(url)}">${opt(speedOpts, ps.speed || '')}</select></div>
         <div class="setr"><span class="tx"><b>Pular início</b><small>Vinheta e propaganda do começo</small></span><select class="sel" data-c="ps" data-k="intro" data-x="${esc(url)}">${opt(secs, ps.intro || 0)}</select></div>
         <div class="setr"><span class="tx"><b>Pular final</b><small>Créditos e chamadas do fim</small></span><select class="sel" data-c="ps" data-k="outro" data-x="${esc(url)}">${opt(secs, ps.outro || 0)}</select></div>
         <div class="setr"><span class="tx"><b>Baixar episódios novos</b></span><button class="sw ${ps.autodl ? 'on' : ''}" role="switch" aria-checked="${!!ps.autodl}" aria-label="Baixar episódios novos" data-a="psToggle" data-x="${esc(url)}" data-y="autodl"><span></span></button></div>
+        <div class="setr"><span class="tx"><b>Pasta</b></span><button class="btn sm" data-a="setFolder" data-x="${esc(url)}">${s.folder ? esc(s.folder) : 'Escolher'}</button></div>
       </div>
-      <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px"><span class="lbl">Episódios novos vão para</span><div class="seg">${[['', 'Padrão'], ['inbox', 'Caixa de entrada'], ['queue', 'Fila'], ['archive', 'Arquivo']].map(([k, t]) => `<button class="${(ps.dest || '') === k ? 'on' : ''}" data-a="psDest" data-x="${esc(url)}" data-y="${k}">${t}</button>`).join('')}</div></div></section>` : ''}
-      <section><div class="sect"><h2>Episódios <span class="mut" style="font-weight:500">· ${ids.length}</span></h2></div>
-        ${ids.slice(0, showMore).map(id => epRow(id, { showFeed: false })).join('')}
-        ${ids.length > showMore ? '<button class="btn" style="width:100%;margin-top:10px" data-a="more">Ver mais episódios</button>' : ''}</section>
-    </div></div>`;
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px"><span class="lbl">Episódios novos vão para</span><div class="seg">${[['', 'Padrão'], ['inbox', 'Caixa de entrada'], ['queue', 'Fila'], ['archive', 'Arquivo']].map(([k, t]) => `<button class="${(ps.dest || '') === k ? 'on' : ''}" data-a="psDest" data-x="${esc(url)}" data-y="${k}">${t}</button>`).join('')}</div></div>
+      <div class="wrapchips" style="margin-top:18px"><button class="btn" data-a="refreshOne" data-x="${esc(url)}">Atualizar feed</button><button class="btn" data-a="unsub" data-x="${esc(url)}">Deixar de seguir</button></div>`;
+  } else if (showTab === 'like') {
+    const gid = (s && subGenre(s)) || CATMAP[(p.cat || '').toLowerCase()];
+    if (!gid) body = '<p class="mut" style="padding:12px 0">Não sei a categoria deste podcast para sugerir parecidos.</p>';
+    else { loadTop(gid); const l = D.top[gid]; body = l ? (l.filter(r => !isFollowing(r) && (r.title || '').toLowerCase() !== (p.title || '').toLowerCase()).slice(0, 12).map(resultCard).join('') || '<p class="mut">Nada novo por aqui.</p>') : loadingRow; }
+  } else {
+    const sn = db.snips.filter(x => x.feed === url);
+    body = sn.length ? `<div class="hscroll" style="flex-direction:column">${sn.map(x => snipCard(x).replace('flex:0 0 260px', 'width:100%')).join('')}</div>` : '<p class="mut" style="padding:12px 0">Nenhum momento salvo deste podcast ainda. No player, toque no marcador para guardar um trecho.</p>';
+  }
+  const desc = p.desc || '';
+  const long = desc.length > 220;
+  return `<div class="sh">
+    ${p.image ? `<div class="sh-bg"><img src="${esc(p.image)}" alt=""></div>` : ''}
+    <div class="sh-top"><button class="ib gl" data-a="back" aria-label="Voltar">${I.back}</button><span style="flex:1"></span><button class="ib gl" data-a="shareFeed" data-x="${esc(url)}" aria-label="Compartilhar">${ICO.share}</button></div>
+    <div class="sh-head">
+      ${cov(p.image, p.title, '100%', '18px', 40).replace('width:100%;height:100%', 'width:100%;aspect-ratio:1').replace('<span class="cov"', '<span class="cov sh-art"')}
+      <span class="sh-kick">${esc([p.cat, p.author].filter(Boolean).join(' · '))}</span>
+      <h1 class="sh-title">${esc(p.title)}</h1>
+      <div class="sh-stars" role="group" aria-label="Sua nota">${s ? [1, 2, 3, 4, 5].map(n => `<button data-a="rate" data-x="${esc(url)}" data-y="${n}" aria-label="${n} estrela${n > 1 ? 's' : ''}" class="${n <= rating ? 'on' : ''}">${STAR(n <= rating)}</button>`).join('') + `<span class="mut" style="font-size:13px;margin-left:6px">${rating ? 'Sua nota' : 'Dê sua nota'}</span>` : ''}</div>
+      <div class="sh-acts">${s ? `<button class="btn sh-follow on" data-a="unsub" data-x="${esc(url)}">${I.ok.replace('#7BC47F', 'currentColor')} Seguindo</button>` : `<button class="btn sh-follow" data-a="sub" data-x="${esc(url)}">${I.plus} Seguir</button>`}${ids[0] ? `<button class="btn sh-play" data-a="playgo" data-x="${ids.find(id => !isDone(id)) || ids[0]}">${I.play} ${posOf(ids.find(id => !isDone(id)) || ids[0]) ? 'Continuar' : 'Mais recente'}</button>` : ''}</div>
+    </div>
+    ${desc ? `<p class="sh-desc ${long && !showDesc ? 'clip' : ''}">${esc(desc)}</p>${long ? `<button class="link" style="align-self:flex-start;color:#fff;font-weight:600;font-size:14px" data-a="showDesc">${showDesc ? 'Ver menos' : 'Ver mais'}</button>` : ''}` : ''}
+    <div class="sh-info">
+      ${p.author ? `<div class="sh-ir">${ICO.mic}<span>${esc(p.author)}</span></div>` : ''}
+      ${cad ? `<div class="sh-ir">${ICO.cal}<span>${esc(cad)}</span></div>` : ''}
+      <div class="sh-ir">${ICO.list}<span>${ids.length} episódios${first ? ' · desde ' + new Date(first).getFullYear() : ''}</span></div>
+      ${avg ? `<div class="sh-ir">${ICO.clock}<span>Cerca de ${fmtD(avg)} por episódio</span></div>` : ''}
+      ${heard >= 60 ? `<div class="sh-ir">${ICO.ear}<span>Você já ouviu ${fmtH(heard)}</span></div>` : ''}
+      ${host ? `<button class="sh-ir" data-a="url" data-x="${esc(p.link)}">${ICO.globe}<span>${esc(host)}</span></button>` : ''}
+    </div>
+    <div class="sh-tabs">${tabs.map(([k, t]) => `<button class="${showTab === k ? 'on' : ''}" data-a="showTab" data-x="${k}">${t}</button>`).join('')}</div>
+    <div class="sh-body">${body}</div>
+  </div>`;
 };
 async function loadPreview(url) {
   if (PREV[url] && PREV[url].loading) return;
@@ -684,7 +780,8 @@ const CATMAP = { 'technology': 1318, 'tecnologia': 1318, 'science': 1533, 'ciên
 const D = { q: '', res: null, loading: false, genre: null, top: {}, loadingTop: {} };
 async function itunesSearch(q) {
   const j = await getJSON('https://itunes.apple.com/search?media=podcast&limit=30&country=' + db.set.country + '&term=' + encodeURIComponent(q));
-  return (j.results || []).filter(r => r.feedUrl).map(r => ({ feed: r.feedUrl, title: r.collectionName, author: r.artistName, image: r.artworkUrl600 || r.artworkUrl100, cat: r.primaryGenreName, gid: (r.genreIds || [])[0] }));
+  const out = (j.results || []).filter(r => r.feedUrl).map(r => ({ feed: r.feedUrl, title: r.collectionName, author: r.artistName, image: r.artworkUrl600 || r.artworkUrl100, cat: r.primaryGenreName, gid: (r.genreIds || [])[0] }));
+  out.forEach(r => { META[r.feed] = { title: r.title, image: r.image, author: r.author }; }); return out;
 }
 async function topChart(gid) {
   if (D.top[gid]) return D.top[gid];
@@ -694,6 +791,7 @@ async function topChart(gid) {
     list = ((j.feed && j.feed.entry) || []).map(e => ({ itunesId: e.id && e.id.attributes && e.id.attributes['im:id'], title: e['im:name'] && e['im:name'].label, author: e['im:artist'] && e['im:artist'].label, image: e['im:image'] && e['im:image'][e['im:image'].length - 1].label.replace(/\d+x\d+bb/, '600x600bb'), summary: e.summary && e.summary.label || '', cat: e.category && e.category.attributes && e.category.attributes.label || '' }));
   } catch (e) { }
   if (!list.length && !gid) { try { const j = await getJSON('https://rss.applemarketingtools.com/api/v2/' + db.set.country + '/podcasts/top/40/podcasts.json'); list = ((j.feed && j.feed.results) || []).map(r => ({ itunesId: r.id, title: r.name, author: r.artistName, image: (r.artworkUrl100 || '').replace('100x100', '600x600') })); } catch (e) { } }
+  list.forEach(r => { if (r.itunesId) META['it:' + r.itunesId] = { title: r.title, image: r.image, author: r.author }; });
   D.top[gid] = list; return list;
 }
 function loadTop(gid) { if (D.top[gid] || D.loadingTop[gid]) return; D.loadingTop[gid] = true; topChart(gid).then(() => { D.loadingTop[gid] = false; if (view === 'disc' || view === 'chart') render(); }); }
@@ -874,6 +972,7 @@ V.set = () => {
     ]],
     ['Aparência', [
       row('Cor de destaque', '', `<span class="row" style="gap:8px">${['#F5B544', '#C8F169', '#4FB3BF', '#B48EE0', '#E26D9A'].map(c => `<button aria-label="Cor ${c}" data-a="accent" data-x="${c}" style="width:30px;height:30px;border-radius:15px;background:${c};border:${db.set.accent === c ? '3px solid #F3F4F6' : '0'}"></button>`).join('')}</span>`),
+      row('Efeito de vidro', 'Barra de abas e mini player translúcidos, flutuando sobre o conteúdo', sw('glass', 'Efeito de vidro')),
       row('Aba inicial', '', sel('tab', TABS.map(([k, t]) => [k, t])))
     ]],
     ['Privacidade', [
@@ -996,9 +1095,10 @@ async function coverTint(url) {
 // ---------------------------------------------------------------- render
 function render() {
   document.documentElement.style.setProperty('--acc', db.set.accent);
+  document.body.classList.toggle('glass-on', db.set.glass !== false);
   const v = V[view] ? view : 'home';
   $('#main').innerHTML = V[v]();
-  $('#main').classList.toggle('tint', v === 'player'); $('#main').classList.toggle('showtint', v === 'show'); document.body.classList.toggle('pvmode', v === 'player');
+  $('#main').classList.toggle('tint', v === 'player'); document.body.classList.toggle('pvmode', v === 'player');
   const at = activeTab();
   $('#side').innerHTML = `<div class="row" style="padding:0 10px 24px;gap:10px">${LOGO(34)}<b style="font-size:20px;letter-spacing:-.03em">Podcast</b></div>
     ${TABS.map(([k, t]) => `<button class="sb ${at === k ? 'on' : ''}" data-a="go" data-x="${k}">${t}${k === 'home' && db.inbox.length ? `<span class="badge">${db.inbox.length}</span>` : ''}</button>`).join('')}
@@ -1068,7 +1168,7 @@ const ACT = {
   sub: (x, b) => subscribe(x, b.dataset.y ? { gid: +b.dataset.y } : null),
   subIt: async x => { try { await subscribe(await feedFromItunes(x)); } catch (e) { toast('Não consegui seguir: ' + e.message); } },
   preview: x => go('show', x),
-  previewIt: async x => { toast('Abrindo…'); try { go('show', await feedFromItunes(x)); } catch (e) { toast('Não consegui abrir: ' + e.message); } },
+  previewIt: x => { go('show', IT2FEED[x] || 'it:' + x); },
   unsub: x => modal(`<h2>Deixar de seguir?</h2><p class="mut">${esc((sub(x) || {}).title)} sai da biblioteca, da fila e da caixa de entrada. Os downloads são apagados.</p><div class="wrapchips"><button class="btn pri" data-a="unsubYes" data-x="${esc(x)}">Deixar de seguir</button><button class="btn" data-a="close">Cancelar</button></div>`),
   unsubYes: x => { closeModal(); unsubscribe(x); },
   setFolder: x => { const s = sub(x); const fs = [...new Set(Object.values(db.subs).map(y => y.folder).filter(Boolean))]; modal(`<h2>Pasta</h2><input class="txt" id="fname" list="flist" placeholder="Ex.: Tecnologia" value="${esc(s.folder || '')}"><datalist id="flist">${fs.map(f => `<option value="${esc(f)}">`).join('')}</datalist><div class="wrapchips">${fs.map(f => `<button class="chip" data-a="fpick" data-x="${esc(f)}">${esc(f)}</button>`).join('')}</div><div class="wrapchips"><button class="btn pri" data-a="folderSave" data-x="${esc(x)}">Salvar</button>${s.folder ? `<button class="btn" data-a="folderSave" data-x="${esc(x)}" data-y="none">Tirar da pasta</button>` : ''}<button class="btn" data-a="close">Cancelar</button></div>`); },
@@ -1080,6 +1180,10 @@ const ACT = {
   psToggle: (x, b) => { const s = sub(x); s.ps = s.ps || {}; s.ps[b.dataset.y] = !s.ps[b.dataset.y]; s.t = now(); save(); render(); },
   psDest: (x, b) => { const s = sub(x); s.ps = s.ps || {}; s.ps.dest = b.dataset.y || null; s.t = now(); save(); render(); },
   more: () => { showMore += 40; render(); },
+  showTab: x => { showTab = x; render(); },
+  showDesc: () => { showDesc = !showDesc; render(); },
+  rate: (x, b) => { const s = sub(x); if (!s) return; const n = +b.dataset.y; s.rating = s.rating === n ? 0 : n; s.t = now(); save(); render(); },
+  shareFeed: async x => { const t = (sub(x) || PREV[x] || {}).title || 'Podcast'; try { if (navigator.share) { await navigator.share({ title: t, url: x }); return; } } catch (e) { } toast((await copy(x)) ? 'Link do feed copiado' : x, 4000); },
   addRss: () => modal(`<h2>Adicionar por link</h2><p class="mut" style="font-size:13px">Cole o endereço RSS do podcast.</p><input class="txt" id="rssurl" placeholder="https://…" inputmode="url"><div class="wrapchips"><button class="btn pri" data-a="rssGo">Abrir</button><button class="btn" data-a="opmlImport">Importar arquivo XML</button><button class="btn" data-a="close">Cancelar</button></div>`),
   rssGo: () => { const u = $('#rssurl').value.trim(); if (!/^https?:\/\//.test(u)) { toast('Cole um link que comece com http'); return; } closeModal(); go('show', u); },
   genre: x => { closeModal(); D.genre = +x || null; D.res = null; D.q = ''; if (view !== 'disc') go('disc'); else render(); $('#main').scrollTop = 0; },
@@ -1092,7 +1196,7 @@ const ACT = {
   dlClear: async () => { for (const id of Object.keys(DL)) await delDownload(id, true); dlSize = null; render(); toast('Downloads apagados'); },
   statsClear: () => { db.stats = {}; save(); render(); toast('Estatísticas apagadas'); },
   wipe: () => modal(`<h2>Apagar todos os dados?</h2><p class="mut">Isso apaga tudo deste aparelho. Se você usa o Google Drive, os dados de lá continuam e voltam ao entrar de novo.</p><div class="wrapchips"><button class="btn pri" data-a="wipeYes">Apagar tudo</button><button class="btn" data-a="close">Cancelar</button></div>`),
-  wipeYes: async () => { await ACT.dlClear(); localStorage.removeItem('pc:db'); localStorage.removeItem('pc:gd'); location.hash = ''; location.reload(); },
+  wipeYes: async () => { await ACT.dlClear(); storeReady = false; await inv('store_write', { name: 'dados.json', text: '{}' }).catch(() => { }); localStorage.removeItem('pc:db'); localStorage.removeItem('pc:gd'); location.hash = ''; location.reload(); },
   opmlImport: () => modal(`<h2>Importar XML de podcasts</h2><p class="mut" style="font-size:13px;line-height:1.5">Aceita a <b>lista de inscrições</b> exportada de outro app (OPML / XML do AntennaPod, Pocket Casts, Podcast Addict, Apple Podcasts…) e também o <b>XML (RSS) de um podcast</b>. Pode escolher vários arquivos de uma vez ou colar o conteúdo.</p><input type="file" multiple accept=".opml,.xml,.rss,text/xml,application/xml,application/rss+xml,text/x-opml" id="opmlfile" class="txt" style="padding:8px;height:auto"><textarea class="txt" id="opmltext" placeholder="…ou cole o XML aqui"></textarea><div class="wrapchips"><button class="btn pri" data-a="opmlGo">Importar</button><button class="btn" data-a="close">Cancelar</button></div>`),
   opmlGo: async () => { const fs = Array.from($('#opmlfile').files || []); const texts = fs.length ? await Promise.all(fs.map(f => f.text())) : [$('#opmltext').value]; closeModal(); for (const t of texts) await importXml(t); },
   opmlExport: async () => { const x = exportOpml(); const okc = await copy(x); try { const p = await inv('save_text', { name: 'podcasts.opml', text: x }); toast('Salvo em ' + p, 5000); } catch (e) { toast(okc ? 'OPML copiado' : 'Não consegui exportar: ' + e); } },
@@ -1127,9 +1231,11 @@ document.addEventListener('click', ev => { const b = ev.target.closest('[data-a]
 document.addEventListener('change', ev => {
   const el = ev.target; const c = el.dataset.c; if (!c) return;
   if (c === 'set') { const k = el.dataset.k; const v = el.value; db.set[k] = isNaN(+v) || v === '' ? v : +v; touch('setT'); if (NP && (k === 'back' || k === 'fwd')) NP.setSkip(db.set.back * 1000, db.set.fwd * 1000); if (NP && k === 'cont') syncNativeQueue(); if (k === 'speed' && db.cur && !((subOf(db.cur) || {}).ps || {}).speed) A.playbackRate = +v; if (k === 'country') { D.top = {}; D.forYou = null; } save(); render(); }
+  if (c === 'showSort') { showSort = el.value; render(); return; }
   if (c === 'ps') { const s = sub(el.dataset.x); s.ps = s.ps || {}; s.ps[el.dataset.k] = el.value === '' ? null : +el.value; s.t = now(); if (el.dataset.k === 'speed' && db.cur && ep(db.cur).feed === s.url) A.playbackRate = speedFor(ep(db.cur)); save(); }
 });
 document.addEventListener('keydown', ev => {
+  if (ev.target.dataset && ev.target.dataset.k === 'epsearch' && ev.key === 'Enter') { ev.preventDefault(); showQ = ev.target.value.trim(); render(); return; }
   if (ev.target.dataset && ev.target.dataset.k === 'search' && ev.key === 'Enter') { ev.preventDefault(); doSearch(ev.target.value); ev.target.blur(); return; }
   if (/INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
   if (ev.key === ' ') { ev.preventDefault(); toggle(); } else if (ev.key === 'ArrowLeft') skip(-db.set.back); else if (ev.key === 'ArrowRight') skip(db.set.fwd);
@@ -1253,7 +1359,7 @@ const GD = (() => {
         const r = await call('POST', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', { 'Content-Type': 'multipart/related; boundary=' + bd }, body);
         if (r.status >= 300) throw new Error('envio falhou (' + r.status + ')'); st.fid = JSON.parse(r.text).id;
       }
-      st.last = now(); persist(); localStorage.setItem('pc:db', JSON.stringify(db)); if (manual) toast('Sincronizado');
+      st.last = now(); persist(); persistNow(); if (manual) toast('Sincronizado');
     } catch (e) { st.err = 'Erro: ' + e.message; if (manual) toast('Sincronização: ' + e.message, 4000); }
     st.busy = false; render();
   }
@@ -1263,9 +1369,21 @@ const GD = (() => {
 })();
 
 // ---------------------------------------------------------------- início
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && NP) { A.poll(); ingestListen(); podAction(); render(); } if (document.visibilityState === 'hidden') { savePos(); localStorage.setItem('pc:db', JSON.stringify(db)); if (GD.on()) GD.sync(false); } });
-window.addEventListener('beforeunload', () => { savePos(); localStorage.setItem('pc:db', JSON.stringify(db)); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && NP) { A.poll(); ingestListen(); podAction(); render(); } if (document.visibilityState === 'hidden') { savePos(); persistNow(); if (GD.on()) GD.sync(false); } });
+window.addEventListener('beforeunload', () => { savePos(); persistNow(); });
+async function loadStore() {
+  try {
+    const t = await inv('store_read', { name: 'dados.json' });
+    if (t) { const j = JSON.parse(t); const d = JSON.parse(JSON.stringify(DEF)); Object.assign(d, j); d.set = Object.assign({}, DEF.set, j.set || {}); d.lists = Object.assign({}, DEF.lists, j.lists || {}); db = d; }
+    storeReady = true;
+    const keep = new Set([...db.queue, ...db.inbox, db.cur, ...Object.keys(db.prog), ...db.snips.map(x => x.ep)]);
+    for (const [id, e] of Object.entries(db.eps)) if (!db.subs[e.feed] && !keep.has(id)) delete db.eps[id];
+    if (!t) await persistNow(); // primeira vez: migra o que estava no localStorage
+    localStorage.removeItem('pc:db');
+  } catch (e) { storeReady = false; }
+}
 (async function start() {
+  await loadStore();
   if (!location.hash) history.replaceState(null, '', '#/' + (db.set.tab || 'home'));
   setRoute();
   if (NP) {

@@ -101,6 +101,28 @@ fn downloads_size(app: tauri::AppHandle) -> Result<u64, String> {
     Ok(total)
 }
 
+// ---------- Banco de dados do app num arquivo (sem o limite de ~5 MB do localStorage) ----------
+fn db_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let d = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&d).map_err(|e| e.to_string())?;
+    Ok(d.join("podcast-dados.json"))
+}
+
+#[tauri::command]
+fn db_read(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let p = db_path(&app)?;
+    if !p.exists() { return Ok(None); }
+    fs::read_to_string(p).map(Some).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn db_write(app: tauri::AppHandle, text: String) -> Result<(), String> {
+    let p = db_path(&app)?;
+    let tmp = p.with_extension("tmp");
+    fs::write(&tmp, text).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, &p).map_err(|e| e.to_string())
+}
+
 // ---------- Salvar arquivo de texto (OPML, momentos em Markdown) ----------
 #[tauri::command]
 fn save_text(app: tauri::AppHandle, name: String, text: String) -> Result<String, String> {
@@ -114,6 +136,29 @@ fn save_text(app: tauri::AppHandle, name: String, text: String) -> Result<String
     let p = dir.join(safe_name(&name));
     fs::write(&p, text).map_err(|e| e.to_string())?;
     Ok(p.to_string_lossy().to_string())
+}
+
+// ---------- Armazenamento dos dados do app (arquivo, sem o limite do localStorage) ----------
+fn store_path(app: &tauri::AppHandle, name: &str) -> Result<PathBuf, String> {
+    let d = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&d).map_err(|e| e.to_string())?;
+    Ok(d.join(safe_name(name)))
+}
+
+#[tauri::command]
+fn store_write(app: tauri::AppHandle, name: String, text: String) -> Result<(), String> {
+    let p = store_path(&app, &name)?;
+    let tmp = p.with_extension("tmp");
+    fs::write(&tmp, text).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, &p).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn store_read(app: tauri::AppHandle, name: String) -> Result<Option<String>, String> {
+    let p = store_path(&app, &name)?;
+    if !p.exists() { return Ok(None); }
+    fs::read_to_string(p).map(Some).map_err(|e| e.to_string())
 }
 
 // ---------- Login do Google (OAuth com retorno para 127.0.0.1) ----------
@@ -176,6 +221,10 @@ pub fn run() {
             download_path,
             downloads_size,
             save_text,
+            store_write,
+            store_read,
+            db_read,
+            db_write,
             oauth_listen,
             oauth_poll
         ])
