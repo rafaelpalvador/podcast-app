@@ -104,6 +104,7 @@ const ep = id => db.eps[id];
 const subOf = id => { const e = ep(id); return e && sub(e.feed); };
 const isDone = id => !!(db.prog[id] && db.prog[id].done);
 const posOf = id => (db.prog[id] && !db.prog[id].done && db.prog[id].pos) || 0;
+const durOf = id => { const p = db.prog[id], e = db.eps[id]; return (p && p.dur > 0 ? p.dur : 0) || (e && e.dur) || 0; };
 const fileName = e => e.id + ((e.url.split('?')[0].match(/\.(mp3|m4a|aac|ogg|opus|mp4|wav)$/i) || ['.mp3'])[0]).toLowerCase();
 
 // ---------------------------------------------------------------- RSS
@@ -311,7 +312,7 @@ window.__podAction = podAction;
 const X = {}; // capítulos e transcrições carregados {id:{ch:[],tr:[],loading}}
 let pendingSeek = null, sleep = null, lastSave = 0, ptab = 'ch';
 const speedFor = e => { const s = e && sub(e.feed); return (s && s.ps && s.ps.speed) || db.set.speed || 1; };
-async function play(id, at) {
+async function play(id, at, noAuto) {
   const e = ep(id); if (!e) return;
   if (NP) {
     if (db.cur !== id || !A.src) {
@@ -323,10 +324,10 @@ async function play(id, at) {
       if (db.inbox.includes(id)) { db.inbox = db.inbox.filter(x => x !== id); db.lists.inboxT = now(); }
       if (db.queue.includes(id)) { db.queue = db.queue.filter(x => x !== id); db.lists.queueT = now(); }
       const items = [await nativeItem(id), ...(db.set.cont ? await Promise.all(db.queue.slice(0, 15).map(nativeItem)) : [])];
-      NP.load(JSON.stringify({ items, startMs: Math.round(start * 1000), speed: speedFor(e), play: true }));
-      A.st = { id, pos: start * 1000, dur: (e.dur || 0) * 1000, playing: true, speed: speedFor(e) };
+      NP.load(JSON.stringify({ items, startMs: Math.round(start * 1000), speed: speedFor(e), play: !noAuto }));
+      A.st = { id, pos: start * 1000, dur: durOf(id) * 1000, playing: !noAuto, speed: speedFor(e) };
       loadExtras(id); save();
-    } else { if (at != null) A.currentTime = at; NP.setSpeed(speedFor(e)); A.play(); }
+    } else { if (at != null) A.currentTime = at; NP.setSpeed(speedFor(e)); if (!noAuto) A.play(); }
     render(); return;
   }
   if (db.cur !== id || !A.src) {
@@ -344,6 +345,7 @@ async function play(id, at) {
     loadExtras(id); setMedia(e); save();
   } else if (at != null) { A.currentTime = at; }
   A.playbackRate = speedFor(e); A.defaultPlaybackRate = A.playbackRate;
+  if (noAuto) { render(); return; }
   try { await A.play(); } catch (err) { if (err.name !== 'AbortError') toast('Não consegui tocar: ' + err.message, 4000); }
   render();
 }
@@ -471,6 +473,18 @@ function go(v, a, replace) {
   if (replace) history.replaceState(null, '', h); else if (location.hash !== h) history.pushState(null, '', h);
   setRoute();
 }
+function goAnim(v, a, fromEl) {
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!document.startViewTransition || reduce) { go(v, a); return; }
+  document.querySelectorAll('[style*="view-transition-name"]').forEach(el => { el.style.viewTransitionName = ''; });
+  const c = fromEl && (fromEl.querySelector('.cov') || fromEl.closest('.cov')); if (c) c.style.viewTransitionName = 'pvart';
+  document.documentElement.classList.add(v === 'player' ? 'vt-up' : 'vt-down');
+  const t = document.startViewTransition(() => {
+    go(v, a);
+    if (v !== 'player') { const h = db.cur && document.querySelector('[data-vt="' + db.cur + '"]'); if (h) h.style.viewTransitionName = 'pvart'; }
+  });
+  t.finished.finally(() => { document.documentElement.classList.remove('vt-up', 'vt-down'); document.querySelectorAll('[data-vt]').forEach(el => { el.style.viewTransitionName = ''; }); });
+}
 function setRoute() {
   const m = location.hash.match(/^#\/([a-z]+)(?:\/(.*))?$/);
   const nv = m ? m[1] : (db.set.tab || 'home'); const na = m && m[2] != null ? decodeURIComponent(m[2]) : null;
@@ -554,11 +568,13 @@ V.home = () => {
       <button class="ib" data-a="refresh" aria-label="Atualizar feeds">${refreshing ? '<span class="spin"></span>' : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-3M4 13a8 8 0 0 0 14.9 3M4 4v4h4M20 20v-4h-4"/></svg>'}</button>
       <button class="ib" data-a="go" data-x="disc" aria-label="Buscar">${I.search}</button></header>
     ${!hasSubs ? `<div class="card" style="display:flex;flex-direction:column;gap:12px;padding:22px"><h2 style="font-size:22px">Comece seguindo seus podcasts</h2><p class="mut" style="line-height:1.5">Busque pelo nome, cole o link RSS ou traga suas inscrições de outro app com um arquivo OPML.</p><div class="wrapchips"><button class="btn pri" data-a="go" data-x="disc">Buscar podcasts</button><button class="btn" data-a="opmlImport">Importar XML / OPML</button>${GD.on() ? '' : '<button class="btn" data-a="go" data-x="set">Entrar com Google</button>'}</div></div>` : ''}
-    ${ce ? `<button class="hero" data-a="playgo" data-x="${cont}">${cov(epImg(ce), feedTitle(ce.feed), '96px', '18px', 18)}
-      <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px"><span class="lbl" style="color:#8FD8E0">Continuar</span><span class="clamp2" style="font-size:17px;font-weight:600;letter-spacing:-.02em;line-height:1.25">${esc(ce.title)}</span>
-      <span style="font-size:12px;color:#A9C6C9">${esc(feedTitle(ce.feed))}${ce.dur ? ' · faltam ' + fmtD(ce.dur - posOf(cont)) : ''}</span>
-      <span class="prog" style="background:#24494B"><i style="width:${ce.dur ? Math.min(100, posOf(cont) / ce.dur * 100) : 0}%"></i></span></span>
-      <span class="pp" style="width:52px;height:52px;border-radius:26px" aria-hidden="true">${I.play}</span></button>` : ''}
+    ${ce ? (() => { const dd = durOf(cont), ps = cont === db.cur && A.src ? A.currentTime || posOf(cont) : posOf(cont), tc = tintOf(epImg(ce)), playing = cont === db.cur && !A.paused;
+      return `<div class="hero glass" style="${tc ? `background:linear-gradient(135deg,rgba(${tc},.55),rgba(${tc},.16) 70%,rgba(255,255,255,.03))` : ''}">
+      <button class="hero-open" data-a="openPlayer" data-x="${cont}" aria-label="Abrir o player">${cov(epImg(ce), feedTitle(ce.feed), '96px', '18px', 18).replace('<span class="cov"', '<span class="cov" data-vt="' + cont + '"')}
+      <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px"><span class="lbl" style="color:rgba(255,255,255,.75)">${playing ? 'Tocando agora' : 'Continuar'}</span><span class="clamp2" style="font-size:17px;font-weight:600;letter-spacing:-.02em;line-height:1.25">${esc(ce.title)}</span>
+      <span style="font-size:12px;color:rgba(255,255,255,.7)">${esc(feedTitle(ce.feed))}${dd ? ' · faltam ' + fmtD(dd - ps) : ''}</span>
+      <span class="prog" style="background:rgba(255,255,255,.18)"><i style="width:${dd ? Math.min(100, ps / dd * 100) : 0}%;background:#fff"></i></span></span></button>
+      <button class="pp hero-play" data-a="${playing ? 'toggle' : 'playgo'}" data-x="${cont}" aria-label="${playing ? 'Pausar' : 'Tocar'}">${playing ? I.pause : I.play}</button></div>`; })() : ''}
     <div class="two">
       <section><div class="sect"><h2>Caixa de entrada <span class="mut" style="font-weight:500">· ${db.inbox.length}</span></h2>${db.inbox.length ? '<button class="link" data-a="inboxClear">Arquivar tudo</button>' : ''}</div>
         <div style="display:flex;flex-direction:column;gap:8px">
@@ -626,6 +642,7 @@ V.smart = () => {
 let showMore = 40;
 V.show = () => {
   const url = arg; const s = sub(url); const p = s || PREV[url];
+  if (p && p.image) coverTint(p.image);
   if (!p) { loadPreview(url); return `<div class="page"><button class="ib" data-a="back" aria-label="Voltar">${I.back}</button><div class="card empty"><span class="spin"></span><span class="mut">Carregando o podcast…</span></div></div>`; }
   if (s && s.seenAt < now() - 1000) { s.seenAt = now(); save(true); }
   const ids = s ? (s.eps || []) : p.ids;
@@ -635,7 +652,7 @@ V.show = () => {
   const opt = (list, val) => list.map(([v, t]) => `<option value="${v}" ${String(val ?? '') === String(v) ? 'selected' : ''}>${t}</option>`).join('');
   return `<div class="page" style="gap:24px">
     <button class="ib" data-a="back" aria-label="Voltar">${I.back}</button>
-    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end">${cov(p.image, p.title, '140px', '24px', 28)}
+    <div class="show-head">${cov(p.image, p.title, '168px', '22px', 30).replace('<span class="cov"', '<span class="cov showart"')}
       <div style="flex:1 1 240px;display:flex;flex-direction:column;gap:8px"><h1>${esc(p.title)}</h1><span class="mut">${esc([p.author, p.cat].filter(Boolean).join(' · '))}</span>
         <div class="wrapchips" style="margin-top:6px">${s ? `<button class="btn light" data-a="unsub" data-x="${esc(url)}">Seguindo</button><button class="btn" data-a="setFolder" data-x="${esc(url)}">${s.folder ? 'Pasta: ' + esc(s.folder) : 'Pôr numa pasta'}</button><button class="btn" data-a="refreshOne" data-x="${esc(url)}">Atualizar</button>` : `<button class="btn pri" data-a="sub" data-x="${esc(url)}">Seguir</button>`}</div></div></div>
     ${p.desc ? `<p class="mut" style="font-size:14px;line-height:1.55;max-width:760px;white-space:pre-line">${esc(p.desc)}</p>` : ''}
@@ -934,19 +951,20 @@ function skipIcon(dir, sec) {
   const arc = dir < 0 ? '<path d="M12 4.5A7.5 7.5 0 1 1 4.5 12"/><path d="M12 1.5 8.5 4.5 12 7.5"/>' : '<path d="M12 4.5A7.5 7.5 0 1 0 19.5 12"/><path d="M12 1.5 15.5 4.5 12 7.5"/>';
   return `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${arc}<text x="12" y="15.2" text-anchor="middle" font-size="6.6" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui,sans-serif">${sec}</text></svg>`;
 }
-// Cor da capa: baixa a imagem pelo lado nativo (sem bloqueio de CORS) e tira a cor média
+// Cor da capa: baixa a imagem pelo lado nativo (sem bloqueio de CORS) e tira a cor marcante
 const TINT = (() => { try { return JSON.parse(localStorage.getItem('pc:tint') || '{}'); } catch (e) { return {}; } })();
+const TINTING = {};
 let tintFor = '';
 function applyTint(c) {
   const m = $('#main'); if (!m) return;
   const [r, g, b] = c || [40, 44, 52];
   const mix = (k, base) => `rgb(${Math.round(r * k + base)},${Math.round(g * k + base)},${Math.round(b * k + base)})`;
-  m.style.setProperty('--pv1', mix(0.62, 6)); m.style.setProperty('--pv2', mix(0.30, 6)); m.style.setProperty('--pv3', mix(0.12, 8));
+  m.style.setProperty('--pv1', mix(0.62, 4)); m.style.setProperty('--pv2', mix(0.26, 2)); m.style.setProperty('--pv3', '#000');
+  m.style.setProperty('--tint', `${r},${g},${b}`);
 }
-async function coverTint(url) {
-  if (tintFor === url) { applyTint(TINT[url]); return; }
-  tintFor = url; applyTint(TINT[url]);
-  if (!url || TINT[url]) return;
+async function fetchTint(url) {
+  if (!url || TINT[url] || TINTING[url]) return TINT[url];
+  TINTING[url] = true;
   try {
     const r = await inv('http_req', { method: 'GET', url, headers: {}, body: null });
     const bmp = await createImageBitmap(new Blob([b64d(r.body)]));
@@ -957,10 +975,22 @@ async function coverTint(url) {
       R += a; G += b2; B += c; n++;
       const score = sat * (mx / 255) * (mx > 40 && mx < 245 ? 1 : 0.3); if (!best || score > best[0]) best = [score, a, b2, c];
     }
-    let col = best && best[0] > 0.18 ? [best[1], best[2], best[3]] : [R / n, G / n, B / n];
+    const col = best && best[0] > 0.18 ? [best[1], best[2], best[3]] : [R / n, G / n, B / n];
     TINT[url] = col.map(Math.round); localStorage.setItem('pc:tint', JSON.stringify(TINT));
-    if (tintFor === url) applyTint(TINT[url]);
-  } catch (err) { }
+  } catch (err) { TINT[url] = null; }
+  delete TINTING[url];
+  return TINT[url];
+}
+function tintOf(url) { // "r,g,b" ou null (e busca em segundo plano)
+  const c = TINT[url]; if (c) return c.join(',');
+  if (url && c === undefined) fetchTint(url).then(x => { if (x && (view === 'home' || view === 'show')) render(); });
+  return null;
+}
+async function coverTint(url) {
+  tintFor = url; applyTint(TINT[url]);
+  if (!url || TINT[url]) return;
+  const c = await fetchTint(url);
+  if (c && tintFor === url) applyTint(c);
 }
 
 // ---------------------------------------------------------------- render
@@ -968,7 +998,7 @@ function render() {
   document.documentElement.style.setProperty('--acc', db.set.accent);
   const v = V[view] ? view : 'home';
   $('#main').innerHTML = V[v]();
-  $('#main').classList.toggle('tint', v === 'player'); document.body.classList.toggle('pvmode', v === 'player');
+  $('#main').classList.toggle('tint', v === 'player'); $('#main').classList.toggle('showtint', v === 'show'); document.body.classList.toggle('pvmode', v === 'player');
   const at = activeTab();
   $('#side').innerHTML = `<div class="row" style="padding:0 10px 24px;gap:10px">${LOGO(34)}<b style="font-size:20px;letter-spacing:-.03em">Podcast</b></div>
     ${TABS.map(([k, t]) => `<button class="sb ${at === k ? 'on' : ''}" data-a="go" data-x="${k}">${t}${k === 'home' && db.inbox.length ? `<span class="badge">${db.inbox.length}</span>` : ''}</button>`).join('')}
@@ -995,12 +1025,21 @@ function epInfo(id) {
     <button class="btn" data-a="close">Fechar</button>`);
 }
 const ACT = {
-  go: (x, b) => { closeModal(); go(x, b.dataset.y != null ? b.dataset.y : null); },
-  back: () => { if (history.length > 1) history.back(); else go('home'); },
+  go: (x, b) => { closeModal(); if (x === 'player') goAnim('player', null, b); else go(x, b.dataset.y != null ? b.dataset.y : null); },
+  back: () => {
+    if (view === 'player' && document.startViewTransition && history.length > 1) {
+      document.documentElement.classList.add('vt-down');
+      const t = document.startViewTransition(() => new Promise(res => { window.addEventListener('popstate', () => { setTimeout(() => { const h = db.cur && document.querySelector('[data-vt="' + db.cur + '"]'); if (h) h.style.viewTransitionName = 'pvart'; res(); }, 0); }, { once: true }); history.back(); }));
+      t.finished.finally(() => { document.documentElement.classList.remove('vt-down'); document.querySelectorAll('[data-vt]').forEach(el => { el.style.viewTransitionName = ''; }); });
+      return;
+    }
+    if (history.length > 1) history.back(); else go('home');
+  },
   close: closeModal,
   url: x => openUrl(x),
   play: x => play(x),
-  playgo: x => { closeModal(); play(x); go('player'); },
+  playgo: (x, b) => { closeModal(); play(x); goAnim('player', null, b && b.closest('.hero')); },
+  openPlayer: (x, b) => { closeModal(); if (db.cur !== x || !A.src) play(x, null, true); goAnim('player', null, b); },
   toggle,
   skip: x => skip(+x > 0 ? db.set.fwd : -db.set.back),
   seek: (x, b, ev) => { const r = b.getBoundingClientRect(); const d = A.duration || 0; if (d) { A.currentTime = Math.max(0, Math.min(d - 1, (ev.clientX - r.left) / r.width * d)); updBar(); } },

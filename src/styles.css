@@ -1,4 +1,4 @@
-:root{--bg:#0C0D10;--bg2:#0A0B0E;--s1:#15171C;--s2:#1A1D23;--s3:#1D2027;--ln:#1E2128;--ln2:#2A2E37;--tx:#F3F4F6;--mut:#A1A7B3;--acc:#F5B544;--acc-ink:#1A1305;--ok:#7BC47F;--r:22px}
+:root{--bg:#000;--bg2:#000;--s1:rgba(255,255,255,.055);--s2:rgba(255,255,255,.09);--s3:rgba(255,255,255,.08);--ln:rgba(255,255,255,.09);--ln2:rgba(255,255,255,.14);--glass-hi:inset 0 1px 0 rgba(255,255,255,.10),inset 0 0 0 .5px rgba(255,255,255,.04);--tx:#F3F4F6;--mut:#A1A7B3;--acc:#F5B544;--acc-ink:#1A1305;--ok:#7BC47F;--r:22px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font-family:Geist,Inter,'Segoe UI',Roboto,system-ui,sans-serif;font-size:15px;overscroll-behavior:none}
 h1,h2,h3,p{margin:0}
@@ -238,4 +238,59 @@ body.pvmode .main{padding-top:calc(env(safe-area-inset-top,0px) + 6px)}
   .pv-panel{grid-area:panel;justify-self:start}
   .pv-body{max-height:34vh}
   #toast{bottom:110px}
+}
+
+/* ---------- OLED + liquid glass (discreto) ---------- */
+html,body{background:#000}
+.glass,.card,.setg,.seg,.search,.chip,.ib:not(.ghost),.btn:not(.pri):not(.light),#modal .box,.dband{
+  backdrop-filter:blur(22px) saturate(170%);-webkit-backdrop-filter:blur(22px) saturate(170%);box-shadow:var(--glass-hi)}
+.card,.setg{background:linear-gradient(160deg,rgba(255,255,255,.075),rgba(255,255,255,.035));border-color:rgba(255,255,255,.08)}
+.chip.on,.seg button.on{box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.btn.pri,.pp,.big{box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 6px 18px rgba(0,0,0,.35)}
+#modal{background:rgba(0,0,0,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#modal .box{background:rgba(28,30,36,.72);border-color:rgba(255,255,255,.12)}
+.dband{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border-color:rgba(255,255,255,.06)}
+.side{background:#000;border-right-color:rgba(255,255,255,.07)}
+.sb.on{background:rgba(255,255,255,.08);box-shadow:var(--glass-hi)}
+/* cartão "Continuar" */
+.hero{position:relative;display:flex;align-items:center;gap:12px;padding:14px 14px 14px 14px;border-radius:28px;background:linear-gradient(135deg,rgba(80,90,100,.45),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.1);overflow:hidden}
+.hero-open{flex:1;min-width:0;display:flex;align-items:center;gap:16px;background:none;border:0;padding:0;color:#fff;text-align:left}
+.hero-play{width:56px;height:56px;border-radius:28px}
+/* barras flutuantes de vidro (celular) */
+.col{position:relative}
+.main{padding-bottom:calc(170px + env(safe-area-inset-bottom,0px))}
+.tabbar{position:absolute;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));height:66px;padding:0 4px;border-radius:33px;border:1px solid rgba(255,255,255,.1);
+  background:rgba(22,23,27,.62);backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);box-shadow:var(--glass-hi),0 10px 30px rgba(0,0,0,.5);z-index:5}
+.tb.on .tbi{background:rgba(255,255,255,.12)}
+#bar{position:absolute;left:0;right:0;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:5}
+.bar{background:rgba(30,32,38,.62);border:1px solid rgba(255,255,255,.1);border-radius:22px;backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);box-shadow:var(--glass-hi),0 10px 30px rgba(0,0,0,.45)}
+body.pvmode #bar{display:none}
+body.pvmode .main{padding-bottom:calc(30px + env(safe-area-inset-bottom,0px))}
+/* página do podcast com a identidade dele */
+.main.showtint{background:linear-gradient(180deg,var(--pv1,#222) 0,var(--pv2,#111) 300px,#000 640px) no-repeat;background-attachment:local}
+.show-head{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end}
+.showart{box-shadow:0 20px 50px rgba(0,0,0,.55)}
+.showtint .btn.light{background:rgba(255,255,255,.92)}
+.showtint .card,.showtint .setg{background:linear-gradient(160deg,rgba(var(--tint,255,255,255),.16),rgba(255,255,255,.03))}
+.showtint .ep .ib.ghost{background:rgba(var(--tint,255,255,255),.22);color:#fff}
+.showtint .seg button.on{background:rgba(255,255,255,.92)}
+/* transição para o player */
+#pvart{view-transition-name:pvart}
+::view-transition-group(pvart){animation-duration:.42s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.38s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
+.vt-up::view-transition-new(root){animation-name:pv-up}
+.vt-up::view-transition-old(root){animation-name:pv-fade}
+.vt-down::view-transition-old(root){animation-name:pv-downout}
+.vt-down::view-transition-new(root){animation-name:pv-fadein}
+@keyframes pv-up{from{transform:translateY(14%);opacity:0}to{transform:none;opacity:1}}
+@keyframes pv-fade{to{opacity:0;transform:scale(.97)}}
+@keyframes pv-downout{to{transform:translateY(16%);opacity:0}}
+@keyframes pv-fadein{from{opacity:0;transform:scale(.97)}}
+.main.tint{--pv3:#000}
+@media (min-width:900px){
+  .main{padding-bottom:110px}
+  .tabbar{display:none}
+  #bar{bottom:0}
+  .bar{border-radius:0;border-left:0;border-right:0;border-bottom:0;background:rgba(14,15,18,.7)}
+  .show-head .showart{width:200px!important;height:200px!important}
 }
