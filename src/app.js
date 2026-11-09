@@ -527,7 +527,7 @@ function updBar() {
   const b = $('#bprog'); if (b) b.style.width = p + '%';
   const t1 = $('#bt1'); if (t1) t1.textContent = fmtT(t);
   const t2 = $('#bt2'); if (t2) t2.textContent = fmtT(d);
-  const pf = $('#pfill'); if (pf) { pf.style.width = p + '%'; $('#pknob').style.left = p + '%'; $('#pt1').textContent = fmtT(t); $('#pt2').textContent = '−' + fmtT(d - t) + ' a ' + String(A.playbackRate).replace('.', ',') + '×'; }
+  const pf = $('#pfill'); if (pf && !scrubbing) { pf.style.width = p + '%'; $('#pknob').style.left = p + '%'; $('#pt1').textContent = fmtT(t); $('#pt2').textContent = '−' + fmtT((d - t) / (A.playbackRate || 1)); }
 }
 let lastCue = -2, lastCh = -2;
 function updLive() {
@@ -536,7 +536,7 @@ function updLive() {
   if (ptab === 'tr' && x.tr.length) { const i = curIdx(x.tr); if (i !== lastCue) { lastCue = i; document.querySelectorAll('.cue.cur').forEach(c => c.classList.remove('cur')); const el = document.querySelector('.cue[data-i="' + i + '"]'); if (el) { el.classList.add('cur'); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } } }
   if (x.ch.length) { const i = curIdx(x.ch); if (i !== lastCh) { lastCh = i; document.querySelectorAll('.chap.cur').forEach(c => c.classList.remove('cur')); const el = document.querySelector('.chap[data-i="' + i + '"]'); if (el) el.classList.add('cur'); const l = $('#chlabel'); if (l && x.ch[i]) l.textContent = 'Capítulo ' + (i + 1) + ' · ' + x.ch[i].t; } }
 }
-function updPlayBtn() { const b = $('#bigplay'); if (b) { b.innerHTML = A.paused ? I.play : I.pause; b.setAttribute('aria-label', A.paused ? 'Tocar' : 'Pausar'); } }
+function updPlayBtn() { const b = $('#bigplay'); if (b) { b.innerHTML = A.paused ? PLAYL : PAUSEL; b.setAttribute('aria-label', A.paused ? 'Tocar' : 'Pausar'); } const art = $('#pvart'); if (art) art.classList.toggle('paused', A.paused); }
 function renderBar() { $('#bar').innerHTML = bar(); updBar(); }
 
 // ---------------------------------------------------------------- telas
@@ -842,33 +842,92 @@ V.player = () => {
   const tabs = [['ch', 'Capítulos'], ['tr', 'Transcrição'], ['sn', 'Momentos'], ['nt', 'Notas']];
   const mySnips = db.snips.filter(s => s.ep === db.cur);
   const sp = String(A.playbackRate || 1).replace('.', ',');
+  const img = epImg(e);
+  coverTint(img);
   let body = '';
-  if (ptab === 'ch') body = x.ch.length ? x.ch.map((c, i) => `<button class="chap ${i === ci ? 'cur' : ''}" data-i="${i}" data-a="seekTo" data-x="${c.at}"><span style="font-size:12px;width:52px;color:#A9C6C9">${fmtT(c.at)}</span><span style="flex:1">${esc(c.t)}</span></button>`).join('') : `<p style="color:#A9C6C9;font-size:14px">${x.loading ? 'Carregando…' : 'Este episódio não tem capítulos.'}</p>`;
-  if (ptab === 'tr') body = x.tr.length ? `<span style="font-size:12px;color:#A9C6C9">Toque numa frase para pular até ela</span>` + x.tr.map((c, i) => `<p class="cue" data-i="${i}" ${c.at >= 0 ? `data-a="seekTo" data-x="${c.at}"` : ''}>${c.who ? `<small>${esc(c.who)}</small>` : ''}${esc(c.t)}</p>`).join('') : `<p style="color:#A9C6C9;font-size:14px">${x.loading ? 'Carregando…' : 'Este podcast não publica transcrição.'}</p>`;
-  if (ptab === 'sn') body = (mySnips.map(s => snipCard(s, true).replace('flex:0 0 260px', 'width:100%')).join('') || '') + `<p style="font-size:12px;color:#A9C6C9">Salve um trecho com o botão abaixo do player. Os momentos podem ser exportados em Markdown.</p>`;
-  if (ptab === 'nt') body = `<p style="font-size:14px;line-height:1.6;color:#D4E3E4;white-space:pre-line">${esc(e.desc || 'Sem descrição.')}</p>${e.link ? `<button class="btn sm" data-a="url" data-x="${esc(e.link)}">Abrir página do episódio</button>` : ''}`;
-  return `<div class="page" style="gap:20px">
-    <header class="row" style="justify-content:space-between"><button class="ib" style="background:#15302F" data-a="back" aria-label="Fechar player">${I.down}</button><span class="lbl" style="color:#8FD8E0">${db.queue.length ? db.queue.length + ' na fila' : 'Tocando'}</span><button class="ib" style="background:#15302F" data-a="epinfo" data-x="${db.cur}" aria-label="Mais opções">${I.more}</button></header>
-    <div class="pl"><div class="plL">
-      ${cov(epImg(e), feedTitle(e.feed), '100%', '30px', 44).replace('width:100%;height:100%', 'width:100%;max-width:340px;aspect-ratio:1;align-self:center')}
-      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;color:#8FD8E0;font-weight:600" id="chlabel">${ci >= 0 ? 'Capítulo ' + (ci + 1) + ' · ' + esc(x.ch[ci].t) : ''}</span><h1 style="font-size:23px;line-height:1.2">${esc(e.title)}</h1><button class="link" style="text-align:left;color:#A9C6C9;font-size:14px" data-a="go" data-x="show" data-y="${esc(e.feed)}">${esc(feedTitle(e.feed))}</button></div>
-      <div style="display:flex;flex-direction:column;gap:6px"><div class="scrub" data-a="seek"><span class="trk"></span><span class="fill" id="pfill"></span>${d ? x.ch.map(c => `<span class="mk" style="left:${c.at / d * 100}%"></span>`).join('') : ''}<span class="knob" id="pknob"></span></div>
-        <div class="row" style="justify-content:space-between;font-size:12px;color:#A9C6C9"><span id="pt1">0:00</span><span id="pt2"></span></div></div>
-      <div class="ctrl"><button class="ib ghost" data-a="chap" data-x="-1" aria-label="Capítulo anterior" ${x.ch.length ? '' : 'disabled'}>${I.prevc}</button><button class="ib ghost skip" data-a="skip" data-x="-1" aria-label="Voltar">${I.r15}${db.set.back}</button>
-        <button class="big" id="bigplay" data-a="toggle" aria-label="${A.paused ? 'Tocar' : 'Pausar'}">${A.paused ? I.play : I.pause}</button>
-        <button class="ib ghost skip" data-a="skip" data-x="1" aria-label="Avançar">${I.f30}${db.set.fwd}</button><button class="ib ghost" data-a="chap" data-x="1" aria-label="Próximo capítulo" ${x.ch.length ? '' : 'disabled'}>${I.nextc}</button></div>
-      <div class="wrapchips"><button class="pill" data-a="speed">${sp}×</button><button class="pill ${sleep ? 'on' : ''}" data-a="sleep">${I.moon.replace('width="18" height="18"', 'width="14" height="14"')} ${sleep === 'end' ? 'Fim do episódio' : typeof sleep === 'number' ? Math.ceil((sleep - now()) / 60000) + ' min' : 'Timer'}</button><button class="pill" data-a="download" data-x="${db.cur}">${DL[db.cur] ? 'Baixado' : DLING[db.cur] ? 'Baixando…' : 'Baixar'}</button></div>
-      <button class="btn" style="height:52px;border-radius:26px;border-color:#2E5A5C;background:#12292A;font-size:15px" data-a="snip">${I.snip} Salvar este momento</button>
+  if (ptab === 'ch') body = x.ch.length ? x.ch.map((c, i) => `<button class="chap ${i === ci ? 'cur' : ''}" data-i="${i}" data-a="seekTo" data-x="${c.at}"><span class="chn">${i + 1}</span><span style="flex:1">${esc(c.t)}</span><span class="cht">${fmtT(c.at)}</span></button>`).join('') : `<p class="pv-mut">${x.loading ? 'Carregando…' : 'Este episódio não tem capítulos.'}</p>`;
+  if (ptab === 'tr') body = x.tr.length ? x.tr.map((c, i) => `<p class="cue" data-i="${i}" ${c.at >= 0 ? `data-a="seekTo" data-x="${c.at}"` : ''}>${c.who ? `<small>${esc(c.who)}</small>` : ''}${esc(c.t)}</p>`).join('') : `<p class="pv-mut">${x.loading ? 'Carregando…' : 'Este podcast não publica transcrição.'}</p>`;
+  if (ptab === 'sn') body = mySnips.map(s => `<button class="pv-snip" data-a="seekTo" data-x="${s.at}"><span class="cht">${fmtT(s.at)}</span><span>${s.q ? '“' + esc(s.q) + '”' : 'Momento salvo'}</span></button>`).join('') + `<p class="pv-mut" style="font-size:13px">Toque no marcador ao lado do título para salvar o trecho que está tocando.</p>`;
+  if (ptab === 'nt') body = `<p style="font-size:15px;line-height:1.6;color:rgba(255,255,255,.82);white-space:pre-line">${esc(e.desc || 'Sem descrição.')}</p>${e.link ? `<button class="pv-chip" data-a="url" data-x="${esc(e.link)}">Abrir página do episódio</button>` : ''}`;
+  const sleepTxt = sleep === 'end' ? 'Fim do ep.' : typeof sleep === 'number' ? Math.ceil((sleep - now()) / 60000) + ' min' : '';
+  return `<div class="pv">
+    <div class="pv-top" id="pvgrab"><span class="grab"></span>
+      <div class="row" style="justify-content:space-between;width:100%">
+        <button class="pv-ic" data-a="back" aria-label="Fechar player">${I.down}</button>
+        <span class="pv-from"><small>Tocando de</small><span class="ell">${db.queue.length ? 'sua fila · ' + db.queue.length + ' a seguir' : esc(feedTitle(e.feed))}</span></span>
+        <button class="pv-ic" data-a="epinfo" data-x="${db.cur}" aria-label="Mais opções">${I.more}</button>
+      </div></div>
+    <div class="pv-grid">
+      <div class="pv-art ${A.paused ? 'paused' : ''}" id="pvart">${cov(img, feedTitle(e.feed), '100%', '18px', 56).replace('width:100%;height:100%', 'width:100%;aspect-ratio:1')}</div>
+      <div class="pv-main">
+        <div class="pv-meta"><div style="flex:1;min-width:0">
+          <span class="pv-ch" id="chlabel">${ci >= 0 ? esc(x.ch[ci].t) : ''}</span>
+          <h1 class="pv-title">${esc(e.title)}</h1>
+          <button class="pv-show" data-a="go" data-x="show" data-y="${esc(e.feed)}">${esc(feedTitle(e.feed))}</button></div>
+          <button class="pv-ic sm ${mySnips.length ? 'on' : ''}" data-a="snip" aria-label="Salvar este momento">${I.snip}</button></div>
+        <div class="pv-scrub" id="pvscrub"><div class="trk"><span class="fill" id="pfill"></span>${d ? x.ch.map(c => c.at > 0 ? `<span class="mk" style="left:${c.at / d * 100}%"></span>` : '').join('') : ''}</div><span class="knob" id="pknob"></span></div>
+        <div class="pv-times"><span id="pt1">0:00</span><span id="pt2"></span></div>
+        <div class="pv-ctrl">
+          <button class="pv-ic lg" data-a="skip" data-x="-1" aria-label="Voltar ${db.set.back} segundos">${skipIcon(-1, db.set.back)}</button>
+          <button class="pv-play" id="bigplay" data-a="toggle" aria-label="${A.paused ? 'Tocar' : 'Pausar'}">${A.paused ? PLAYL : PAUSEL}</button>
+          <button class="pv-ic lg" data-a="skip" data-x="1" aria-label="Avançar ${db.set.fwd} segundos">${skipIcon(1, db.set.fwd)}</button>
+        </div>
+        <div class="pv-tools">
+          <button class="pv-tool" data-a="speed" aria-label="Velocidade"><b>${sp}×</b></button>
+          <button class="pv-tool ${sleep ? 'on' : ''}" data-a="sleep" aria-label="Timer de sono">${I.moon}${sleepTxt ? `<small>${sleepTxt}</small>` : ''}</button>
+          <button class="pv-tool" data-a="chap" data-x="-1" aria-label="Capítulo anterior" ${x.ch.length ? '' : 'disabled'}>${I.prevc}</button>
+          <button class="pv-tool" data-a="chap" data-x="1" aria-label="Próximo capítulo" ${x.ch.length ? '' : 'disabled'}>${I.nextc}</button>
+          <button class="pv-tool ${DL[db.cur] ? 'on' : ''}" data-a="download" data-x="${db.cur}" aria-label="${DL[db.cur] ? 'Baixado' : 'Baixar'}">${DLING[db.cur] ? '<span class="spin"></span>' : DL[db.cur] ? I.ok.replace('#7BC47F', 'currentColor') : I.dl}</button>
+        </div>
+      </div>
+      <div class="pv-panel">
+        <div class="pv-tabs">${tabs.map(([k, t]) => `<button class="${ptab === k ? 'on' : ''}" data-a="ptab" data-x="${k}">${t}</button>`).join('')}</div>
+        <div class="pv-body">${body}</div>
+      </div>
     </div>
-    <div class="plR"><div class="ptabs">${tabs.map(([k, t]) => `<button class="${ptab === k ? 'on' : ''}" data-a="ptab" data-x="${k}">${t}</button>`).join('')}</div><div style="display:flex;flex-direction:column;gap:12px">${body}</div></div></div></div>`;
+  </div>`;
 };
+const PLAYL = '<svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.2-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>';
+const PAUSEL = '<svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4" width="4.5" height="16" rx="1.4"/><rect x="14" y="4" width="4.5" height="16" rx="1.4"/></svg>';
+function skipIcon(dir, sec) {
+  const arc = dir < 0 ? '<path d="M12 4.5A7.5 7.5 0 1 1 4.5 12"/><path d="M12 1.5 8.5 4.5 12 7.5"/>' : '<path d="M12 4.5A7.5 7.5 0 1 0 19.5 12"/><path d="M12 1.5 15.5 4.5 12 7.5"/>';
+  return `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${arc}<text x="12" y="15.2" text-anchor="middle" font-size="6.6" font-weight="700" fill="currentColor" stroke="none" font-family="system-ui,sans-serif">${sec}</text></svg>`;
+}
+// Cor da capa: baixa a imagem pelo lado nativo (sem bloqueio de CORS) e tira a cor média
+const TINT = (() => { try { return JSON.parse(localStorage.getItem('pc:tint') || '{}'); } catch (e) { return {}; } })();
+let tintFor = '';
+function applyTint(c) {
+  const m = $('#main'); if (!m) return;
+  const [r, g, b] = c || [40, 44, 52];
+  const mix = (k, base) => `rgb(${Math.round(r * k + base)},${Math.round(g * k + base)},${Math.round(b * k + base)})`;
+  m.style.setProperty('--pv1', mix(0.62, 6)); m.style.setProperty('--pv2', mix(0.30, 6)); m.style.setProperty('--pv3', mix(0.12, 8));
+}
+async function coverTint(url) {
+  if (tintFor === url) { applyTint(TINT[url]); return; }
+  tintFor = url; applyTint(TINT[url]);
+  if (!url || TINT[url]) return;
+  try {
+    const r = await inv('http_req', { method: 'GET', url, headers: {}, body: null });
+    const bmp = await createImageBitmap(new Blob([b64d(r.body)]));
+    const cv = document.createElement('canvas'); cv.width = cv.height = 24; const cx = cv.getContext('2d'); cx.drawImage(bmp, 0, 0, 24, 24);
+    const px = cx.getImageData(0, 0, 24, 24).data; let best = null, R = 0, G = 0, B = 0, n = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      const [a, b2, c] = [px[i], px[i + 1], px[i + 2]]; const mx = Math.max(a, b2, c), mn = Math.min(a, b2, c); const sat = mx ? (mx - mn) / mx : 0;
+      R += a; G += b2; B += c; n++;
+      const score = sat * (mx / 255) * (mx > 40 && mx < 245 ? 1 : 0.3); if (!best || score > best[0]) best = [score, a, b2, c];
+    }
+    let col = best && best[0] > 0.18 ? [best[1], best[2], best[3]] : [R / n, G / n, B / n];
+    TINT[url] = col.map(Math.round); localStorage.setItem('pc:tint', JSON.stringify(TINT));
+    if (tintFor === url) applyTint(TINT[url]);
+  } catch (err) { }
+}
 
 // ---------------------------------------------------------------- render
 function render() {
   document.documentElement.style.setProperty('--acc', db.set.accent);
   const v = V[view] ? view : 'home';
   $('#main').innerHTML = V[v]();
-  $('#main').classList.toggle('tint', v === 'player');
+  $('#main').classList.toggle('tint', v === 'player'); document.body.classList.toggle('pvmode', v === 'player');
   const at = activeTab();
   $('#side').innerHTML = `<div class="row" style="padding:0 10px 24px;gap:10px">${LOGO(34)}<b style="font-size:20px;letter-spacing:-.03em">Podcast</b></div>
     ${TABS.map(([k, t]) => `<button class="sb ${at === k ? 'on' : ''}" data-a="go" data-x="${k}">${t}${k === 'home' && db.inbox.length ? `<span class="badge">${db.inbox.length}</span>` : ''}</button>`).join('')}
@@ -974,6 +1033,15 @@ function smartEditor(p) {
     ${ck('sm_un', 'Só não ouvidos', p.unplayed)}${ck('sm_st', 'Só começados', p.started)}${ck('sm_dl', 'Só baixados', p.dl)}
     <div class="wrapchips"><button class="btn pri" data-a="smartSave" data-x="${p.id || ''}">Salvar</button><button class="btn" data-a="close">Cancelar</button></div>`);
 }
+let scrubbing = false;
+function scrubAt(ev) { const el = $('#pvscrub'); if (!el) return 0; const r = el.getBoundingClientRect(); const f = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)); const d = A.duration || 0; $('#pfill').style.width = f * 100 + '%'; $('#pknob').style.left = f * 100 + '%'; $('#pt1').textContent = fmtT(f * d); $('#pt2').textContent = '−' + fmtT(d - f * d); return f * d; }
+document.addEventListener('pointerdown', ev => { if (!ev.target.closest('#pvscrub')) return; scrubbing = true; $('#pvscrub').classList.add('drag'); scrubAt(ev); ev.preventDefault(); });
+document.addEventListener('pointermove', ev => { if (scrubbing) scrubAt(ev); });
+document.addEventListener('pointerup', ev => { if (!scrubbing) return; scrubbing = false; const s = $('#pvscrub'); if (s) s.classList.remove('drag'); const t = scrubAt(ev); if (A.duration) A.currentTime = t; updBar(); });
+let swY = null;
+document.addEventListener('touchstart', ev => { if (view === 'player' && ev.target.closest('.pv-top,.pv-art') && $('#main').scrollTop <= 0) swY = ev.touches[0].clientY; else swY = null; }, { passive: true });
+document.addEventListener('touchmove', ev => { if (swY == null) return; const dy = ev.touches[0].clientY - swY; const pv = $('.pv'); if (pv && dy > 0) { pv.style.transform = 'translateY(' + dy * 0.6 + 'px)'; pv.style.opacity = String(1 - Math.min(dy / 900, 0.4)); } }, { passive: true });
+document.addEventListener('touchend', ev => { if (swY == null) return; const dy = (ev.changedTouches[0] || {}).clientY - swY; swY = null; const pv = $('.pv'); if (dy > 130) ACT.back(); else if (pv) { pv.style.transform = ''; pv.style.opacity = ''; } });
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-a]'); if (!b || b.disabled) return; const f = ACT[b.dataset.a]; if (f) { ev.preventDefault(); f(b.dataset.x, b, ev); } });
 document.addEventListener('change', ev => {
   const el = ev.target; const c = el.dataset.c; if (!c) return;
