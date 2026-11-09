@@ -1,0 +1,152 @@
+name: Compilar apps (Windows e Android)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore: ['design/**', 'assets/**', '**.md']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows (instalador .exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Número da versão (0.1.N, sobe a cada compilação)
+        shell: bash
+        env:
+          GID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GSEC: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: |
+          node -e "const f='src-tauri/tauri.conf.json',j=JSON.parse(require('fs').readFileSync(f,'utf8'));j.version='0.1.${{ github.run_number }}';require('fs').writeFileSync(f,JSON.stringify(j,null,1))"
+          sed -i "s|/\*BUILD\*/{v:'dev',d:'',c:''}|{v:'0.1.${{ github.run_number }}',d:'$(date -u +%Y-%m-%dT%H:%M:%SZ)',c:'${GITHUB_SHA::7}'}|" src/index.html
+          if [ -n "$GID" ]; then sed -i "s|/\*GOOGLE\*/{id:'',secret:''}|{id:'$GID',secret:'$GSEC'}|" src/index.html && echo "acesso do Google embutido"; fi
+      - name: Instalar dependências
+        run: npm install
+      - name: Ícones do app
+        run: npx tauri icon src-tauri/icons/icon.png
+      - name: Compilar
+        run: npx tauri build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Podcast-Windows
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+  android:
+    name: Android (APK)
+    runs-on: ubuntu-latest
+    env:
+      NDK_VERSION: 27.2.12479018
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Instalar SDK e NDK
+        run: |
+          SDKM=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;${NDK_VERSION}" > /dev/null
+          echo "NDK_HOME=$ANDROID_HOME/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Número da versão (0.1.N, sobe a cada compilação)
+        shell: bash
+        env:
+          GID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GSEC: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: |
+          node -e "const f='src-tauri/tauri.conf.json',j=JSON.parse(require('fs').readFileSync(f,'utf8'));j.version='0.1.${{ github.run_number }}';require('fs').writeFileSync(f,JSON.stringify(j,null,1))"
+          sed -i "s|/\*BUILD\*/{v:'dev',d:'',c:''}|{v:'0.1.${{ github.run_number }}',d:'$(date -u +%Y-%m-%dT%H:%M:%SZ)',c:'${GITHUB_SHA::7}'}|" src/index.html
+          if [ -n "$GID" ]; then sed -i "s|/\*GOOGLE\*/{id:'',secret:''}|{id:'$GID',secret:'$GSEC'}|" src/index.html && echo "acesso do Google embutido"; fi
+      - name: Instalar dependências
+        run: npm install
+      - name: Gerar projeto Android
+        run: npx tauri android init --ci
+      - name: Ícones do app
+        run: npx tauri icon src-tauri/icons/icon.png
+      - name: Permissões (internet, áudio em segundo plano, notificações)
+        run: |
+          M=src-tauri/gen/android/app/src/main/AndroidManifest.xml
+          for P in INTERNET ACCESS_NETWORK_STATE WAKE_LOCK FOREGROUND_SERVICE FOREGROUND_SERVICE_MEDIA_PLAYBACK POST_NOTIFICATIONS; do
+            grep -q "android.permission.$P\"" "$M" || perl -0pi -e "s#(<manifest[^>]*>)#\$1\n    <uses-permission android:name=\"android.permission.$P\" />#" "$M"
+          done
+          grep -n "uses-permission" "$M"
+      - name: Compilar APK (tenta de novo se a rede falhar)
+        run: |
+          P=src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties
+          [ -f "$P" ] && (grep -q networkTimeout "$P" && sed -i 's/^networkTimeout=.*/networkTimeout=120000/' "$P" || echo "networkTimeout=120000" >> "$P")
+          for i in 1 2 3; do
+            npx tauri android build --apk --target aarch64 --target armv7 && exit 0
+            echo "Tentativa $i falhou; esperando 30 s"; sleep 30
+          done
+          exit 1
+      - name: Assinar APK
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          IN=$(find src-tauri/gen/android/app/build/outputs/apk -name "*release*.apk" | head -1)
+          echo "APK: $IN"
+          "$BT/zipalign" -p -f 4 "$IN" alinhado.apk
+          "$BT/apksigner" sign --ks android-assinatura/podcast-pessoal.jks --ks-key-alias podcast --ks-pass pass:podcast-pessoal --key-pass pass:podcast-pessoal --out Podcast-Android.apk alinhado.apk
+          "$BT/apksigner" verify Podcast-Android.apk && ls -la Podcast-Android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Podcast-Android
+          path: Podcast-Android.apk
+          if-no-files-found: error
+
+  publicar:
+    name: Publicar em Releases
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: arquivos
+      - name: Organizar arquivos
+        run: |
+          mkdir -p saida
+          find arquivos -name "*.apk" | head -1 | xargs -I{} cp {} "saida/Podcast-Android.apk"
+          find arquivos -name "*-setup.exe" | head -1 | xargs -I{} cp {} "saida/Podcast-Windows-instalador.exe"
+          ls -la saida
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.${{ github.run_number }}
+          name: Podcast 0.1.${{ github.run_number }}
+          body: |
+            Versão 0.1.${{ github.run_number }} (commit ${{ github.sha }}).
+            - **Android:** `Podcast-Android.apk` — no Obtainium, use o endereço do repositório para receber as atualizações sozinho.
+            - **Windows:** `Podcast-Windows-instalador.exe`.
+            Links fixos (sempre a versão mais nova):
+            - https://github.com/${{ github.repository }}/releases/latest/download/Podcast-Android.apk
+            - https://github.com/${{ github.repository }}/releases/latest/download/Podcast-Windows-instalador.exe
+          prerelease: false
+          make_latest: true
+          files: saida/*
+      - name: Apagar versões antigas (fica só a mais nova)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          KEEP=v0.1.${{ github.run_number }}
+          gh release list --repo ${{ github.repository }} --limit 200 --json tagName -q '.[].tagName' | while read -r T; do
+            if [[ "$T" == v* ]] && [ "$T" != "$KEEP" ]; then echo "apagando $T"; gh release delete "$T" --repo ${{ github.repository }} --cleanup-tag -y || true; fi
+          done

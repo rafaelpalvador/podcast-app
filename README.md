@@ -6,9 +6,37 @@
 
 ---
 
-## Status
+## Baixar
 
-**Fase de design.** Este repositório tem, por enquanto, o design aprovado e o logo. O código do app vem na próxima etapa.
+Links fixos, sempre a versão mais nova:
+
+- **Android:** [Podcast-Android.apk](https://github.com/rafaelpalvador/podcast-app/releases/latest/download/Podcast-Android.apk). No **Obtainium**, adicione o endereço deste repositório para receber as atualizações sozinho.
+- **Windows 11:** [Podcast-Windows-instalador.exe](https://github.com/rafaelpalvador/podcast-app/releases/latest/download/Podcast-Windows-instalador.exe)
+
+Cada envio para o branch `main` compila de novo os dois (GitHub Actions) e substitui a versão em *Releases*.
+
+## Login com Google (sincronização)
+
+Para o botão "Entrar com Google" funcionar, o repositório precisa de dois *secrets* em **Settings → Secrets and variables → Actions**:
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+
+Pode ser o mesmo cliente OAuth "App para computador" usado no Marginália Notes, com a **Google Drive API** ativada no projeto. O app usa só o escopo `drive.appdata`: uma pasta privada e escondida do app no seu Drive, sem acesso aos seus outros arquivos.
+
+## O que já funciona (versão 0.1)
+
+- Busca (iTunes), seguir por link RSS, importar e exportar OPML
+- Caixa de entrada, fila, pastas e playlists inteligentes
+- Player com velocidade por podcast, pular início e final, capítulos, transcrição (quando o podcast publica), timer de sono e controles na tela de bloqueio
+- Downloads para ouvir offline
+- Momentos salvos com exportação em Markdown
+- Estatísticas (quando, o que e de quem você ouviu, tempo economizado) e sugestões por categoria
+- Sincronização entre celular e PC pelo Google Drive
+
+**Ainda não:** cortar silêncio, realçar voz, widgets e atalhos da tela inicial (próximas versões).
+
+## Design
 
 - Design interativo (canvas): https://claude.ai/artifact/KYZm2xfbXYqwUYVRbq3Hqg
 - Fontes do design: [`design/`](design/)
@@ -59,8 +87,12 @@ Seus dados (inscrições, fila, progresso, momentos salvos, estatísticas e ajus
 ## Estrutura
 
 ```
-assets/logo/   logo em SVG (escuro, âmbar, monocromático, símbolo e versão de 16 px)
-design/        fontes do design (.dc.html) e layout do canvas
+src/                 interface do app (HTML, CSS e JavaScript, sem etapa de build)
+src-tauri/           parte nativa em Rust (rede, downloads, login do Google)
+.github/workflows/   compilação do APK e do instalador do Windows
+android-assinatura/  chave que assina o APK
+assets/logo/         logo em SVG
+design/              fontes do design (.dc.html) e layout do canvas
 ```
 
 Os arquivos `.dc.html` são o formato do editor de design onde o projeto foi criado. Para ver e mexer, use o link do canvas acima.

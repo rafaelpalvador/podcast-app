@@ -1,0 +1,43 @@
+{
+ "$schema": "https://schema.tauri.app/config/2",
+ "productName": "Podcast",
+ "mainBinaryName": "Podcast",
+ "version": "0.1.0",
+ "identifier": "app.rafael.podcast",
+ "build": {
+  "frontendDist": "../src"
+ },
+ "app": {
+  "withGlobalTauri": true,
+  "windows": [
+   {
+    "title": "Podcast",
+    "width": 1280,
+    "height": 820,
+    "minWidth": 380,
+    "minHeight": 560,
+    "dragDropEnabled": false
+   }
+  ],
+  "security": {
+   "csp": null,
+   "assetProtocol": {
+    "enable": true,
+    "scope": ["$APPDATA/**", "$APPLOCALDATA/**"]
+   }
+  }
+ },
+ "bundle": {
+  "active": true,
+  "targets": ["nsis"],
+  "icon": [
+   "icons/32x32.png",
+   "icons/128x128.png",
+   "icons/128x128@2x.png",
+   "icons/icon.png",
+   "icons/icon.ico"
+  ],
+  "category": "Music",
+  "shortDescription": "App de podcast pessoal"
+ }
+}
