@@ -488,10 +488,21 @@ function go(v, a, replace) {
 function goAnim(v, a, fromEl) {
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!document.startViewTransition || reduce) { go(v, a); return; }
-  document.documentElement.classList.add(v === 'player' ? 'vt-up' : 'vt-down');
-  // A tela inteira (capa, título e controles) entra junta; espera a capa decodificar para não surgir vazia
-  const t = document.startViewTransition(() => { go(v, a); return coverReady(); });
+  // O player cresce a partir do lugar tocado (mini player, cartão, botão) e volta para o mini player ao fechar
+  const opening = v === 'player';
+  if (opening) setOrigin(originEl(fromEl));
+  document.documentElement.classList.add(opening ? 'vt-up' : 'vt-down');
+  const t = document.startViewTransition(() => { go(v, a); if (!opening) setOrigin($('#bar')); return coverReady(); });
   t.finished.finally(() => { document.documentElement.classList.remove('vt-up', 'vt-down'); });
+}
+function originEl(el) { return el && (el.closest('#bar') || el.closest('.hero') || el.closest('.ep') || el) || $('#bar'); }
+function setOrigin(el) {
+  const r = el && el.getBoundingClientRect(), W = innerWidth, H = innerHeight, st = document.documentElement.style;
+  const ok = r && r.width > 0 && r.height > 0;
+  const box = ok ? r : { top: H - 150, left: 12, right: W - 12, bottom: H - 86 };
+  st.setProperty('--ft', Math.max(0, box.top) + 'px'); st.setProperty('--fl', Math.max(0, box.left) + 'px');
+  st.setProperty('--fr', Math.max(0, W - box.right) + 'px'); st.setProperty('--fb', Math.max(0, H - box.bottom) + 'px');
+  st.setProperty('--fy', Math.round((box.top + box.bottom) / 2 - H / 2) + 'px');
 }
 function coverReady() {
   const im = document.querySelector('#pvart img'); if (!im) return Promise.resolve();
@@ -507,7 +518,7 @@ function vt(kind, fn) {
   t.finished.finally(() => document.documentElement.classList.remove(kind));
 }
 function popTo(kind) { // volta no histórico com animação
-  vt(kind, () => new Promise(res => { window.addEventListener('popstate', () => setTimeout(res, 0), { once: true }); history.back(); }));
+  vt(kind, () => new Promise(res => { window.addEventListener('popstate', () => setTimeout(() => { if (kind === 'vt-down') setOrigin($('#bar')); res(); }, 0), { once: true }); history.back(); }));
 }
 function setRoute() {
   const m = location.hash.match(/^#\/([a-z]+)(?:\/(.*))?$/);

@@ -343,16 +343,19 @@ body.pvmode .main{padding-top:calc(env(safe-area-inset-top,0px) + 4px)}
 
 /* ---------- transições ---------- */
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.42s;animation-timing-function:var(--ease)}
-.vt-up::view-transition-new(root){animation-name:pv-up}
-.vt-up::view-transition-old(root){animation-name:pv-dim}
-.vt-down::view-transition-old(root){animation-name:pv-downout}
-.vt-down::view-transition-new(root){animation-name:pv-undim}
+.vt-up::view-transition-new(root){animation:pv-grow .52s var(--ease) both}
+.vt-up::view-transition-old(root){animation:pv-dim .52s var(--ease) both}
+.vt-down::view-transition-old(root){animation:pv-shrink .46s var(--ease) both;z-index:2}
+.vt-down::view-transition-new(root){animation:pv-undim .46s var(--ease) both}
 .vt-push::view-transition-new(root){animation-name:push-in}
 .vt-push::view-transition-old(root){animation-name:push-out}
 .vt-pop::view-transition-new(root){animation-name:pop-in}
 .vt-pop::view-transition-old(root){animation-name:pop-out}
 .vt-pop::view-transition-old(root),.vt-up::view-transition-new(root){z-index:2}
 @keyframes pv-up{from{transform:translateY(100%)}to{transform:none}}
+/* o player nasce do retângulo de origem (--ft/--fr/--fb/--fl) e ocupa a tela */
+@keyframes pv-grow{from{clip-path:inset(var(--ft,80%) var(--fr,3%) var(--fb,10%) var(--fl,3%) round 22px);transform:translateY(calc(var(--fy,300px) * .12)) scale(.985)}to{clip-path:inset(0 0 0 0 round 0);transform:none}}
+@keyframes pv-shrink{0%{clip-path:inset(0 0 0 0 round 0);opacity:1}80%{opacity:1}to{clip-path:inset(var(--ft,80%) var(--fr,3%) var(--fb,10%) var(--fl,3%) round 22px);transform:translateY(calc(var(--fy,300px) * .12)) scale(.985);opacity:0}}
 @keyframes pv-dim{to{opacity:.4;transform:scale(.94)}}
 @keyframes pv-downout{to{transform:translateY(100%)}}
 @keyframes pv-undim{from{opacity:.4;transform:scale(.94)}}
