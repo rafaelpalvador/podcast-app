@@ -31,10 +31,10 @@ object PodState {
     private val listen = HashMap<String, DoubleArray>()
     private var lastSave = 0L
 
-    fun update(id: String, pos: Long, dur: Long, playing: Boolean, speed: Double, title: String, show: String) {
+    fun update(id: String, pos: Long, dur: Long, playing: Boolean, speed: Double, title: String, show: String, buf: Boolean = false) {
         this.title = title; this.show = show; this.playing = playing
         json = JSONObject().put("id", id).put("pos", pos).put("dur", dur).put("playing", playing)
-            .put("speed", speed).put("error", error).toString()
+            .put("speed", speed).put("error", error).put("buf", buf).toString()
     }
     fun markDone(id: String) { synchronized(done) { if (!done.contains(id)) done.add(id) } }
     fun takeDone(): String = synchronized(done) { val a = JSONArray(done); done.clear(); a.toString() }

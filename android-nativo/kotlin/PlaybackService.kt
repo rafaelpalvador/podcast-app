@@ -14,7 +14,12 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import java.net.HttpURLConnection
@@ -55,7 +60,21 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        // Início rápido: segue redirecionamentos http→https (comuns em feeds com medição),
+        // começa a tocar com ~1 s em buffer e busca direto na posição salva em MP3 sem índice.
+        val http = DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(8000).setReadTimeoutMs(15000)
+            .setUserAgent("Mozilla/5.0 (Linux; Android) Podcast/1.0")
+        val extractors = DefaultExtractorsFactory()
+            .setConstantBitrateSeekingEnabled(true)
+            .setConstantBitrateSeekingAlwaysEnabled(true)
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(20000, 120000, 800, 2000)
+            .build()
         exo = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(this, http), extractors))
+            .setLoadControl(loadControl)
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(),
                 true
@@ -125,7 +144,8 @@ class PlaybackService : MediaSessionService() {
             playing = exo.isPlaying || (exo.playWhenReady && exo.playbackState == Player.STATE_BUFFERING),
             speed = exo.playbackParameters.speed.toDouble(),
             title = md?.title?.toString() ?: "",
-            show = md?.artist?.toString() ?: ""
+            show = md?.artist?.toString() ?: "",
+            buf = exo.playWhenReady && exo.playbackState == Player.STATE_BUFFERING
         )
         PodState.saveLast(this)
     }

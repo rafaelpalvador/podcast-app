@@ -252,6 +252,7 @@ class NativeAudio extends EventTarget {
     if (s.dur && !was.dur) this.dispatchEvent(new Event('loadedmetadata'));
     if (s.playing || s.pos !== was.pos) this.dispatchEvent(new Event('timeupdate'));
     if (s.error && s.error !== was.error) this.dispatchEvent(new Event('error'));
+    if (!!s.buf !== !!was.buf) setBuf(!!s.buf);
     if (++this.n % 10 === 0 || !this.n) ingestListen();
   }
   get paused() { return !this.st.playing; }
@@ -333,8 +334,9 @@ async function play(id, at, noAuto) {
       const s = sub(e.feed); const intro = (s && s.ps && s.ps.intro) || 0; if (start < intro) start = intro;
       if (db.inbox.includes(id)) { db.inbox = db.inbox.filter(x => x !== id); db.lists.inboxT = now(); }
       if (db.queue.includes(id)) { db.queue = db.queue.filter(x => x !== id); db.lists.queueT = now(); }
-      const items = [await nativeItem(id), ...(db.set.cont ? await Promise.all(db.queue.slice(0, 15).map(nativeItem)) : [])];
-      NP.load(JSON.stringify({ items, startMs: Math.round(start * 1000), speed: speedFor(e), play: !noAuto }));
+      // Só o episódio atual vai no load; a fila segue logo depois, sem atrasar o início do áudio
+      NP.load(JSON.stringify({ items: [await nativeItem(id)], startMs: Math.round(start * 1000), speed: speedFor(e), play: !noAuto }));
+      if (db.set.cont && db.queue.length) setTimeout(syncNativeQueue, 0);
       A.st = { id, pos: start * 1000, dur: durOf(id) * 1000, playing: !noAuto, speed: speedFor(e) };
       loadExtras(id); save();
     } else { if (at != null) A.currentTime = at; NP.setSpeed(speedFor(e)); if (!noAuto) A.play(); }
@@ -486,14 +488,16 @@ function go(v, a, replace) {
 function goAnim(v, a, fromEl) {
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!document.startViewTransition || reduce) { go(v, a); return; }
-  document.querySelectorAll('[style*="view-transition-name"]').forEach(el => { el.style.viewTransitionName = ''; });
-  const c = fromEl && (fromEl.querySelector('.cov') || fromEl.closest('.cov')); if (c) c.style.viewTransitionName = 'pvart';
   document.documentElement.classList.add(v === 'player' ? 'vt-up' : 'vt-down');
-  const t = document.startViewTransition(() => {
-    go(v, a);
-    if (v !== 'player') { const h = db.cur && document.querySelector('[data-vt="' + db.cur + '"]'); if (h) h.style.viewTransitionName = 'pvart'; }
-  });
-  t.finished.finally(() => { document.documentElement.classList.remove('vt-up', 'vt-down'); document.querySelectorAll('[data-vt]').forEach(el => { el.style.viewTransitionName = ''; }); });
+  // A tela inteira (capa, título e controles) entra junta; espera a capa decodificar para não surgir vazia
+  const t = document.startViewTransition(() => { go(v, a); return coverReady(); });
+  t.finished.finally(() => { document.documentElement.classList.remove('vt-up', 'vt-down'); });
+}
+function coverReady() {
+  const im = document.querySelector('#pvart img'); if (!im) return Promise.resolve();
+  const done = () => im.classList.add('in');
+  if (im.complete && im.naturalWidth) { done(); return Promise.resolve(); }
+  return Promise.race([(im.decode ? im.decode() : new Promise(r => im.addEventListener('load', r, { once: true }))).then(done, () => { }), new Promise(r => setTimeout(r, 180))]);
 }
 function vt(kind, fn) {
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -503,7 +507,7 @@ function vt(kind, fn) {
   t.finished.finally(() => document.documentElement.classList.remove(kind));
 }
 function popTo(kind) { // volta no histórico com animação
-  vt(kind, () => new Promise(res => { window.addEventListener('popstate', () => setTimeout(() => { const h = db.cur && document.querySelector('[data-vt="' + db.cur + '"]'); if (h) h.style.viewTransitionName = 'pvart'; res(); }, 0), { once: true }); history.back(); }));
+  vt(kind, () => new Promise(res => { window.addEventListener('popstate', () => setTimeout(res, 0), { once: true }); history.back(); }));
 }
 function setRoute() {
   const m = location.hash.match(/^#\/([a-z]+)(?:\/(.*))?$/);
@@ -547,7 +551,7 @@ function bar() {
       <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span class="ell" style="font-size:13px;font-weight:600">${esc(e.title)}</span><span class="mut ell" style="font-size:12px" id="barsub">${esc(feedTitle(e.feed))}</span></span></button>
     <div class="wo" style="flex:2 1 360px;flex-direction:column;gap:4px;align-items:center">
       <div class="row" style="gap:8px"><button class="ib ghost" data-a="skip" data-x="-1" aria-label="Voltar" style="font-size:11px;font-weight:700">−${db.set.back}</button>
-      <button class="pp" data-a="toggle" aria-label="${playing ? 'Pausar' : 'Tocar'}">${playing ? I.pause : I.play}</button>
+      <button class="pp${buffering ? ' buf' : ''}" data-a="toggle" aria-label="${playing ? 'Pausar' : 'Tocar'}">${playing ? I.pause : I.play}</button>
       <button class="ib ghost" data-a="skip" data-x="1" aria-label="Avançar" style="font-size:11px;font-weight:700">+${db.set.fwd}</button></div>
       <div class="row mut" style="width:100%;gap:10px;font-size:11px"><span id="bt1">0:00</span><div class="scrub" data-a="seek" style="flex:1;height:14px"><span class="trk" style="height:4px;background:#2C313B"></span><span class="fill" id="bfill" style="height:4px"></span></div><span id="bt2">0:00</span></div>
     </div>
@@ -556,7 +560,7 @@ function bar() {
       <button class="ib ghost" data-a="snip" aria-label="Salvar momento">${I.snip}</button>
       <button class="ib ghost" data-a="sleep" aria-label="Timer de sono">${I.moon}</button>
     </div>
-    <button class="pp mo" data-a="toggle" aria-label="${playing ? 'Pausar' : 'Tocar'}">${playing ? I.pause : I.play}</button>
+    <button class="pp mo${buffering ? ' buf' : ''}" data-a="toggle" aria-label="${playing ? 'Pausar' : 'Tocar'}">${playing ? I.pause : I.play}</button>
     <span class="barprog mo" id="bprog"></span>
   </div>`;
 }
@@ -575,6 +579,9 @@ function updLive() {
   if (ptab === 'tr' && x.tr.length) { const i = curIdx(x.tr); if (i !== lastCue) { lastCue = i; document.querySelectorAll('.cue.cur').forEach(c => c.classList.remove('cur')); const el = document.querySelector('.cue[data-i="' + i + '"]'); if (el) { el.classList.add('cur'); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } } }
   if (x.ch.length) { const i = curIdx(x.ch); if (i !== lastCh) { lastCh = i; document.querySelectorAll('.chap.cur').forEach(c => c.classList.remove('cur')); const el = document.querySelector('.chap[data-i="' + i + '"]'); if (el) el.classList.add('cur'); const l = $('#chlabel'); if (l && x.ch[i]) l.textContent = 'Capítulo ' + (i + 1) + ' · ' + x.ch[i].t; } }
 }
+let buffering = false;
+function setBuf(on) { buffering = on; const b = $('#bigplay'); if (b) b.classList.toggle('buf', on); document.querySelectorAll('#bar .pp').forEach(m => m.classList.toggle('buf', on)); }
+if (!NP) { A.addEventListener('waiting', () => setBuf(true)); ['playing', 'pause', 'error', 'emptied'].forEach(ev => A.addEventListener(ev, () => setBuf(false))); }
 function updPlayBtn() { const b = $('#bigplay'); if (b) { b.innerHTML = A.paused ? PLAYL : PAUSEL; b.setAttribute('aria-label', A.paused ? 'Tocar' : 'Pausar'); } const art = $('#pvart'); if (art) art.classList.toggle('paused', A.paused); }
 function renderBar() { morph($('#bar'), bar()); updBar(); }
 
@@ -1058,7 +1065,7 @@ V.player = () => {
         <div class="pv-times"><span id="pt1">0:00</span><span id="pt2"></span></div>
         <div class="pv-ctrl">
           <button class="pv-ic lg" data-a="skip" data-x="-1" aria-label="Voltar ${db.set.back} segundos">${skipIcon(-1, db.set.back)}</button>
-          <button class="pv-play" id="bigplay" data-a="toggle" aria-label="${A.paused ? 'Tocar' : 'Pausar'}">${A.paused ? PLAYL : PAUSEL}</button>
+          <button class="pv-play${buffering ? ' buf' : ''}" id="bigplay" data-a="toggle" aria-label="${A.paused ? 'Tocar' : 'Pausar'}">${A.paused ? PLAYL : PAUSEL}</button>
           <button class="pv-ic lg" data-a="skip" data-x="1" aria-label="Avançar ${db.set.fwd} segundos">${skipIcon(1, db.set.fwd)}</button>
         </div>
         <div class="pv-tools">
@@ -1147,7 +1154,9 @@ function morphKids(a, b) {
 }
 function morphNode(x, y) {
   if (x.nodeType === 3 || x.nodeType === 8) { if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; return; }
+  const keepIn = x.tagName === 'IMG' && x.classList.contains('in') && x.getAttribute('src') === y.getAttribute('src');
   morphAttrs(x, y);
+  if (keepIn) x.classList.add('in');
   if (x.tagName === 'INPUT' || x.tagName === 'TEXTAREA') { if (document.activeElement !== x) { const v = y.getAttribute('value') || ''; if (x.value !== v) x.value = v; } return; }
   if (x.tagName === 'SVG' || x.tagName === 'svg') { if (x.innerHTML !== y.innerHTML) x.innerHTML = y.innerHTML; return; }
   morphKids(x, y);

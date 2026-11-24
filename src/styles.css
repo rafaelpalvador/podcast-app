@@ -342,8 +342,6 @@ body.pvmode .main{padding-top:calc(env(safe-area-inset-top,0px) + 4px)}
 .sh-eps .ep+.ep::before{content:'';position:absolute;top:0;left:0;right:0;height:.5px;background:var(--sep)}
 
 /* ---------- transições ---------- */
-#pvart{view-transition-name:pvart}
-::view-transition-group(pvart){animation-duration:.48s;animation-timing-function:var(--ease)}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.42s;animation-timing-function:var(--ease)}
 .vt-up::view-transition-new(root){animation-name:pv-up}
 .vt-up::view-transition-old(root){animation-name:pv-dim}
@@ -426,3 +424,8 @@ button.setr{transition:background-color .15s}
 .cc-row .cc-ok{color:var(--acc);opacity:0;transition:opacity .15s,transform .25s var(--spring);transform:scale(.6)}
 .cc-row.on .cc-ok{opacity:1;transform:none}
 .cc-list .setr+.setr::before{left:16px}
+
+/* carregando o áudio: anel girando em volta do play */
+.pv-play.buf,.buf{position:relative}
+.pv-play.buf::after,#bar .buf::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid rgba(255,255,255,.18);border-top-color:rgba(255,255,255,.85);animation:bufspin .8s linear infinite;pointer-events:none}
+@keyframes bufspin{to{transform:rotate(360deg)}}
