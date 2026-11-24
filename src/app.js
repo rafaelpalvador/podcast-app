@@ -29,10 +29,11 @@ const COLORS = ['#4FB3BF', '#F2C14E', '#E07A5F', '#7BC47F', '#B48EE0', '#3D8BD9'
 const colorOf = s => COLORS[parseInt(hash(s || 'x'), 36) % COLORS.length];
 const initials = s => (s || '?').replace(/[^\p{L}\p{N} ]/gu, '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
 const stripHtml = h => { const d = new DOMParser().parseFromString('<div>' + (h || '') + '</div>', 'text/html'); return (d.body.textContent || '').replace(/\s+\n/g, '\n').replace(/[ \t]+/g, ' ').trim(); };
+const hap = (ms = 8) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { } };
 let toastT;
 function toast(m, ms) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms || 2600); }
-function modal(html) { $('#mbox').innerHTML = html; $('#modal').classList.add('show'); }
-function closeModal() { $('#modal').classList.remove('show'); }
+function modal(html) { const b = $('#mbox'); b.innerHTML = html; b.style.transform = ''; b.scrollTop = 0; $('#modal').classList.add('show'); }
+function closeModal() { const b = $('#mbox'); b.style.transform = ''; b.style.transition = ''; $('#modal').classList.remove('show'); }
 $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
 async function copy(text) { try { await navigator.clipboard.writeText(text); return true; } catch (e) { return false; } }
 const openUrl = url => inv('plugin:opener|open_url', { url }).catch(() => window.open(url, '_blank'));
@@ -91,15 +92,19 @@ function load() {
 let db = load();
 let DL = (() => { try { return JSON.parse(localStorage.getItem('pc:dl') || '{}'); } catch (e) { return {}; } })(); // downloads deste aparelho
 const saveDL = () => localStorage.setItem('pc:dl', JSON.stringify(DL));
-let saveT, storeReady = false;
+let saveT, storeReady = false, epsDirty = false, dataVer = 0;
+const idle = fn => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 2500 }) : setTimeout(fn, 200));
+// Os episódios (grandes) ficam num arquivo separado e só são gravados quando mudam.
 function persistNow() {
   if (!storeReady) return Promise.resolve();
-  const txt = JSON.stringify(db);
-  return inv('store_write', { name: 'dados.json', text: txt }).catch(() => { try { localStorage.setItem('pc:db', txt); } catch (e) { } });
+  const jobs = [inv('store_write', { name: 'dados.json', text: JSON.stringify(Object.assign({}, db, { eps: undefined })) })];
+  if (epsDirty) { epsDirty = false; jobs.push(inv('store_write', { name: 'episodios.json', text: JSON.stringify(db.eps) }).catch(() => { epsDirty = true; })); }
+  return Promise.all(jobs).catch(() => { });
 }
 function save(noSync) {
+  dataVer++;
   clearTimeout(saveT);
-  saveT = setTimeout(persistNow, 600);
+  saveT = setTimeout(() => idle(persistNow), 700);
   if (!noSync) GD.schedule();
   if (NP) { clearTimeout(save.w); save.w = setTimeout(pushWidget, 2000); }
 }
@@ -149,7 +154,7 @@ function mergeItems(url, f, s) {
   const ids = [];
   for (const it of f.items.slice(0, 200)) {
     const id = epId(url, it.guid || it.url);
-    db.eps[id] = Object.assign(db.eps[id] || {}, it, { id, feed: url });
+    db.eps[id] = Object.assign(db.eps[id] || {}, it, { id, feed: url }); epsDirty = true;
     ids.push(id);
   }
   ids.sort((a, b) => db.eps[b].date - db.eps[a].date);
@@ -354,7 +359,7 @@ async function play(id, at, noAuto) {
   try { await A.play(); } catch (err) { if (err.name !== 'AbortError') toast('Não consegui tocar: ' + err.message, 4000); }
   render();
 }
-function toggle() { if (!db.cur) return; if (A.paused) play(db.cur); else A.pause(); }
+function toggle() { if (!db.cur) return; hap(6); if (A.paused) play(db.cur); else A.pause(); }
 function skip(sec) { if (!db.cur) return; A.currentTime = Math.max(0, Math.min((A.duration || 1e9) - 1, A.currentTime + sec)); updBar(); }
 function savePos() { if (!db.cur || !isFinite(A.currentTime)) return; const p = db.prog[db.cur] || {}; db.prog[db.cur] = { pos: A.currentTime, dur: A.duration || p.dur || 0, t: now(), done: false }; save(); }
 let finishing = null;
@@ -452,7 +457,7 @@ function parseTranscript(text, type) {
 }
 function curIdx(list) { const t = A.currentTime; let i = -1; for (let k = 0; k < list.length; k++) { if (list[k].at >= 0 && list[k].at <= t + 0.3) i = k; else if (list[k].at > t) break; } return i; }
 function saveSnip() {
-  const id = db.cur; if (!id) return;
+  const id = db.cur; if (!id) return; hap(14);
   const at = A.currentTime, x = X[id];
   let q = '';
   if (x && x.tr.length) q = x.tr.filter(c => c.at >= at - 25 && c.at <= at + 3).map(c => c.t).join(' ').slice(0, 400);
@@ -490,6 +495,16 @@ function goAnim(v, a, fromEl) {
   });
   t.finished.finally(() => { document.documentElement.classList.remove('vt-up', 'vt-down'); document.querySelectorAll('[data-vt]').forEach(el => { el.style.viewTransitionName = ''; }); });
 }
+function vt(kind, fn) {
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!document.startViewTransition || reduce) { fn(); return; }
+  document.documentElement.classList.add(kind);
+  const t = document.startViewTransition(fn);
+  t.finished.finally(() => document.documentElement.classList.remove(kind));
+}
+function popTo(kind) { // volta no histórico com animação
+  vt(kind, () => new Promise(res => { window.addEventListener('popstate', () => setTimeout(() => { const h = db.cur && document.querySelector('[data-vt="' + db.cur + '"]'); if (h) h.style.viewTransitionName = 'pvart'; res(); }, 0), { once: true }); history.back(); }));
+}
 function setRoute() {
   const m = location.hash.match(/^#\/([a-z]+)(?:\/(.*))?$/);
   const nv = m ? m[1] : (db.set.tab || 'home'); const na = m && m[2] != null ? decodeURIComponent(m[2]) : null;
@@ -500,8 +515,9 @@ window.addEventListener('popstate', setRoute);
 const activeTab = () => view === 'chart' ? 'disc' : view === 'show' || view === 'smart' || view === 'folder' ? 'lib' : view === 'player' ? null : view;
 
 // ---------------------------------------------------------------- componentes
+const PH = '<svg class="ph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 3.5a5 5 0 0 0-5 5v3a5 5 0 0 0 10 0v-3a5 5 0 0 0-5-5z"/><path d="M4.5 11.5a7.5 7.5 0 0 0 15 0M12 19v2"/></svg>';
 function cov(img, title, size, rad, fs) {
-  return `<span class="cov" style="width:${size};height:${size};${rad ? 'border-radius:' + rad + ';' : ''}background:${colorOf(title)};font-size:${fs || 13}px"><span>${esc(initials(title))}</span>${img ? `<img src="${esc(img)}" loading="lazy" alt="" onerror="this.remove()">` : ''}</span>`;
+  return `<span class="cov" style="width:${size};height:${size};${rad ? 'border-radius:' + rad + ';' : ''}">${PH}${img ? `<img src="${esc(img)}" loading="lazy" decoding="async" alt="" onload="this.classList.add('in')" onerror="this.remove()">` : ''}</span>`;
 }
 const epImg = e => e.img || (sub(e.feed) || PREV[e.feed] || {}).image || '';
 const feedTitle = url => (sub(url) || PREV[url] || {}).title || '';
@@ -509,15 +525,19 @@ function epRow(id, opts = {}) {
   const e = ep(id); if (!e) return '';
   const pr = db.prog[id]; const pct = pr && pr.dur && !pr.done ? Math.min(100, pr.pos / pr.dur * 100) : 0;
   const meta = [opts.showFeed !== false ? feedTitle(e.feed) : fmtDate(e.date), fmtD(e.dur), isDone(id) ? 'ouvido' : ''].filter(Boolean).join(' · ');
-  return `<div class="ep">
+  return `<div class="ep" data-key="${opts.key || id}">
     ${opts.handle || ''}
     <button class="tile" style="flex-direction:row;gap:12px;flex:1;min-width:0;align-items:center" data-a="epinfo" data-x="${id}">
-      ${cov(epImg(e), feedTitle(e.feed), '46px', '12px', 11)}
+      ${cov(epImg(e), feedTitle(e.feed), '48px', '9px', 11)}
       <span class="meta"><span class="t ell">${esc(e.title)}</span><span class="m ell">${esc(meta)}</span>${pct ? `<span class="prog"><i style="width:${pct}%"></i></span>` : ''}</span>
     </button>
-    ${DL[id] ? I.ok : DLING[id] ? '<span class="spin"></span>' : ''}
+    ${DL[id] ? I.ok.replace('#7BC47F', 'var(--tx3)') : DLING[id] ? '<span class="spin"></span>' : ''}
     ${opts.tail || `<button class="ib ghost" aria-label="Tocar" data-a="play" data-x="${id}">${db.cur === id && !A.paused ? I.pause : I.play}</button>`}
   </div>`;
+}
+// Linha com ações ao deslizar: direita = ação principal, esquerda = remover
+function swRow(id, inner, right, left) {
+  return `<div class="sw-row" data-key="sw-${id}" data-sw="${id}" data-r="${right[0]}" data-l="${left[0]}"><div class="sw-bg"><span class="r">${right[1]}</span><span class="l">${left[1]}</span></div>${inner}</div>`;
 }
 function bar() {
   const e = ep(db.cur); if (!e || view === 'player') return '';
@@ -556,7 +576,7 @@ function updLive() {
   if (x.ch.length) { const i = curIdx(x.ch); if (i !== lastCh) { lastCh = i; document.querySelectorAll('.chap.cur').forEach(c => c.classList.remove('cur')); const el = document.querySelector('.chap[data-i="' + i + '"]'); if (el) el.classList.add('cur'); const l = $('#chlabel'); if (l && x.ch[i]) l.textContent = 'Capítulo ' + (i + 1) + ' · ' + x.ch[i].t; } }
 }
 function updPlayBtn() { const b = $('#bigplay'); if (b) { b.innerHTML = A.paused ? PLAYL : PAUSEL; b.setAttribute('aria-label', A.paused ? 'Tocar' : 'Pausar'); } const art = $('#pvart'); if (art) art.classList.toggle('paused', A.paused); }
-function renderBar() { $('#bar').innerHTML = bar(); updBar(); }
+function renderBar() { morph($('#bar'), bar()); updBar(); }
 
 // ---------------------------------------------------------------- telas
 const V = {};
@@ -569,27 +589,23 @@ V.home = () => {
   const ce = ep(cont);
   const qTotal = db.queue.reduce((a, id) => a + Math.max(0, ((ep(id) || {}).dur || 0) - posOf(id)), 0);
   return `<div class="page">
-    <header class="row" style="gap:8px"><div style="flex:1;display:flex;flex-direction:column;gap:2px"><span class="mut" style="font-size:13px">${DIAS[d.getDay()]}, ${d.getDate()} de ${['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][d.getMonth()]}</span><h1>${greet()}</h1></div>
-      <button class="ib" data-a="refresh" aria-label="Atualizar feeds">${refreshing ? '<span class="spin"></span>' : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-3M4 13a8 8 0 0 0 14.9 3M4 4v4h4M20 20v-4h-4"/></svg>'}</button>
+    <header class="lt"><div style="flex:1;min-width:0"><span class="sub">${DIAS[d.getDay()]}, ${d.getDate()} de ${['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][d.getMonth()]}</span><h1>${greet()}</h1></div>
       <button class="ib" data-a="go" data-x="disc" aria-label="Buscar">${I.search}</button></header>
     ${!hasSubs ? `<div class="card" style="display:flex;flex-direction:column;gap:12px;padding:22px"><h2 style="font-size:22px">Comece seguindo seus podcasts</h2><p class="mut" style="line-height:1.5">Busque pelo nome, cole o link RSS ou traga suas inscrições de outro app com um arquivo OPML.</p><div class="wrapchips"><button class="btn pri" data-a="go" data-x="disc">Buscar podcasts</button><button class="btn" data-a="opmlImport">Importar XML / OPML</button>${GD.on() ? '' : '<button class="btn" data-a="go" data-x="set">Entrar com Google</button>'}</div></div>` : ''}
     ${ce ? (() => { const dd = durOf(cont), ps = cont === db.cur && A.src ? A.currentTime || posOf(cont) : posOf(cont), tc = tintOf(epImg(ce)), playing = cont === db.cur && !A.paused;
       return `<div class="hero glass" style="${tc ? `background:linear-gradient(135deg,rgba(${tc},.42),rgba(${tc},.10) 75%,#0B0C0F)` : ''}">
       <button class="hero-open" data-a="openPlayer" data-x="${cont}" aria-label="Abrir o player">${cov(epImg(ce), feedTitle(ce.feed), '96px', '18px', 18).replace('<span class="cov"', '<span class="cov" data-vt="' + cont + '"')}
-      <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px"><span class="lbl" style="color:rgba(255,255,255,.75)">${playing ? 'Tocando agora' : 'Continuar'}</span><span class="clamp2" style="font-size:17px;font-weight:600;letter-spacing:-.02em;line-height:1.25">${esc(ce.title)}</span>
+      <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:rgba(255,255,255,.7)">${playing ? 'Tocando agora' : 'Continuar'}</span><span class="clamp2" style="font-size:17px;font-weight:600;letter-spacing:-.02em;line-height:1.25">${esc(ce.title)}</span>
       <span style="font-size:12px;color:rgba(255,255,255,.7)">${esc(feedTitle(ce.feed))}${dd ? ' · faltam ' + fmtD(dd - ps) : ''}</span>
       <span class="prog" style="background:rgba(255,255,255,.18)"><i style="width:${dd ? Math.min(100, ps / dd * 100) : 0}%;background:#fff"></i></span></span></button>
       <button class="pp hero-play" data-a="${playing ? 'toggle' : 'playgo'}" data-x="${cont}" aria-label="${playing ? 'Pausar' : 'Tocar'}">${playing ? I.pause : I.play}</button></div>`; })() : ''}
     <div class="two">
-      <section><div class="sect"><h2>Caixa de entrada <span class="mut" style="font-weight:500">· ${db.inbox.length}</span></h2>${db.inbox.length ? '<button class="link" data-a="inboxClear">Arquivar tudo</button>' : ''}</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-        ${db.inbox.slice(0, 30).map(id => { const e = ep(id); if (!e) return ''; return `<div class="card inbox-card"><button class="tile" style="flex-direction:row;gap:12px;align-items:center" data-a="epinfo" data-x="${id}">${cov(epImg(e), feedTitle(e.feed), '48px', '12px', 12)}<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span class="ell" style="font-size:14px;font-weight:600">${esc(e.title)}</span><span class="mut ell" style="font-size:12px">${esc([feedTitle(e.feed), fmtDate(e.date), fmtD(e.dur)].filter(Boolean).join(' · '))}</span></span></button>
-          <div class="acts"><button class="btn pri" data-a="toQueue" data-x="${id}">+ Fila</button><button class="btn" data-a="toNext" data-x="${id}">Tocar a seguir</button><button class="btn" style="flex:0 0 48px;padding:0" data-a="archive" data-x="${id}" aria-label="Arquivar">${I.arch}</button></div></div>`; }).join('')}
-        ${!db.inbox.length ? `<div class="card empty"><b>Tudo em dia</b><span class="mut" style="font-size:13px">Episódios novos dos podcasts que você segue aparecem aqui.</span></div>` : ''}
-        </div></section>
-      <section><div class="sect"><h2>Fila <span class="mut" style="font-weight:500">· ${qTotal ? fmtH(qTotal) : db.queue.length}</span></h2></div>
-        ${db.queue.map((id, i) => epRow(id, { tail: `<span class="row" style="gap:0"><button class="ib ghost" style="width:34px" data-a="qUp" data-x="${i}" aria-label="Subir" ${i === 0 ? 'disabled' : ''}>${I.up}</button><button class="ib ghost" style="width:34px" data-a="qDown" data-x="${i}" aria-label="Descer" ${i === db.queue.length - 1 ? 'disabled' : ''}>${I.dn}</button><button class="ib ghost" style="width:34px" data-a="qDel" data-x="${i}" aria-label="Tirar da fila">${I.x}</button><button class="ib ghost" data-a="play" data-x="${id}" aria-label="Tocar">${I.play}</button></span>` })).join('')}
-        ${!db.queue.length ? `<div class="card empty"><span class="mut" style="font-size:13px">A fila está vazia. Use “+ Fila” na caixa de entrada ou em qualquer episódio.</span></div>` : ''}
+      <section><div class="sect"><h2>Caixa de entrada${db.inbox.length ? ` <span class="mut">${db.inbox.length}</span>` : ''}</h2>${db.inbox.length ? '<button class="link" data-a="inboxClear">Arquivar tudo</button>' : ''}</div>
+        ${db.inbox.length ? `<div class="list">${db.inbox.slice(0, 30).map(id => ep(id) ? swRow(id, epRow(id, { key: 'in-' + id, tail: `<button class="dplus" data-a="toQueue" data-x="${id}" aria-label="Adicionar à fila">${I.plus}</button>` }), ['toQueue', I.plus + ' Fila'], ['archive', I.arch + ' Arquivar']) : '').join('')}</div>
+        <p class="mut mo" style="font-size:13px;margin:8px 4px 0">Deslize para a direita para pôr na fila, para a esquerda para arquivar.</p>` : `<div class="card empty"><b>Tudo em dia</b><span>Episódios novos dos podcasts que você segue aparecem aqui.</span></div>`}
+      </section>
+      <section><div class="sect"><h2>A seguir${db.queue.length ? ` <span class="mut">${qTotal ? fmtH(qTotal) : db.queue.length}</span>` : ''}</h2></div>
+        ${db.queue.length ? `<div class="list">${db.queue.map(id => ep(id) ? swRow(id, epRow(id, { key: 'q-' + id }), ['toNext', 'Tocar a seguir'], ['qRemove', I.x + ' Remover']) : '').join('')}</div>` : `<div class="card empty"><span>A fila está vazia. Deslize um episódio da caixa de entrada para a direita para adicionar.</span></div>`}
       </section>
     </div>
     ${db.snips.length ? `<section><div class="sect"><h2>Momentos salvos</h2><button class="link" data-a="snipExport">Exportar</button></div><div class="hscroll">${db.snips.slice(0, 12).map(s => snipCard(s)).join('')}</div></section>` : ''}
@@ -617,32 +633,36 @@ V.lib = () => {
     const all = Object.keys(db.eps).filter(id => sub(ep(id).feed));
     const pick = { new: id => !db.prog[id] && ep(id).date > now() - 14 * 864e5, prog: id => posOf(id) > 5, dl: id => DL[id], done: id => isDone(id) }[libFilter];
     const ids = all.filter(pick).sort((a, b) => libFilter === 'prog' ? db.prog[b].t - db.prog[a].t : ep(b).date - ep(a).date).slice(0, 80);
-    list = `<section>${ids.map(id => epRow(id)).join('') || '<div class="card empty"><span class="mut">Nada por aqui.</span></div>'}</section>`;
+    list = `<section>${ids.length ? `<div class="list">${ids.map(id => epRow(id)).join('')}</div>` : '<div class="card empty"><span>Nada por aqui.</span></div>'}</section>`;
   }
   return `<div class="page">
-    <header class="row" style="gap:8px"><h1 style="flex:1">Biblioteca</h1><button class="ib" data-a="addRss" aria-label="Adicionar por link RSS">${I.plus}</button></header>
+    <header class="lt"><h1>Biblioteca</h1><button class="ib" data-a="addRss" aria-label="Adicionar podcast">${I.plus}</button></header>
     <div class="chips">${F.map(([k, t]) => `<button class="chip ${libFilter === k ? 'on' : ''}" data-a="libF" data-x="${k}">${t}</button>`).join('')}</div>
-    ${libFilter === 'pod' && folders.length ? `<section><div class="sect"><h2>Pastas</h2></div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">${folders.map(f => { const ss = subs.filter(s => s.folder === f); return `<button class="card" style="padding:12px;display:flex;flex-direction:column;gap:10px;color:var(--tx);text-align:left${libFolder === f ? ';border-color:var(--acc)' : ''}" data-a="folder" data-x="${esc(f)}"><span style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;width:100%">${[0, 1, 2, 3].map(i => ss[i] ? cov(ss[i].image, ss[i].title, '100%', '8px', 10).replace('width:100%;height:100%', 'width:100%;aspect-ratio:1') : '<span style="aspect-ratio:1;border-radius:8px;background:#1D2027;display:block"></span>').join('')}</span><span class="row" style="justify-content:space-between;width:100%;font-size:14px;font-weight:600">${esc(f)}<span class="mut" style="font-weight:500">${ss.length}</span></span></button>`; }).join('')}</div></section>` : ''}
-    ${libFilter === 'pod' ? `<section><div class="sect"><h2>Playlists inteligentes</h2><button class="link" data-a="smartNew">Criar regra</button></div><div class="card" style="padding:4px 16px">${db.smart.map((p, i) => `<button class="row" style="width:100%;background:none;border:0;border-top:${i ? '1px solid #22252D' : '0'};padding:12px 0;color:var(--tx);text-align:left" data-a="go" data-x="smart" data-y="${p.id}"><span style="width:40px;height:40px;border-radius:12px;background:#1D2027;display:flex;align-items:center;justify-content:center;flex-shrink:0">${I.smart(COLORS[i % COLORS.length])}</span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span style="font-size:14px;font-weight:600">${esc(p.name)}</span><span class="mut ell" style="font-size:12px">${esc(ruleText(p))}</span></span><span class="mut" style="font-size:13px">${smartIds(p).length}</span></button>`).join('')}</div></section>` : ''}
+    ${libFilter === 'pod' && folders.length ? `<section><div class="sect"><h2>Pastas</h2></div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">${folders.map(f => { const ss = subs.filter(s => s.folder === f); return `<button class="card tile" style="padding:10px;gap:10px${libFolder === f ? ';box-shadow:inset 0 0 0 2px var(--acc)' : ''}" data-a="folder" data-x="${esc(f)}"><span style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;width:100%">${[0, 1, 2, 3].map(i => ss[i] ? cov(ss[i].image, ss[i].title, '100%', '8px', 10).replace('width:100%;height:100%', 'width:100%;aspect-ratio:1') : '<span style="aspect-ratio:1;border-radius:6px;background:var(--grp2);display:block"></span>').join('')}</span><span class="row" style="justify-content:space-between;width:100%;font-size:15px;font-weight:600">${esc(f)}<span class="mut num" style="font-weight:500">${ss.length}</span></span></button>`; }).join('')}</div></section>` : ''}
+    ${libFilter === 'pod' ? `<section><div class="sect"><h2>Playlists inteligentes</h2><button class="link" data-a="smartNew">Criar regra</button></div><div class="setg">${db.smart.map((p, i) => `<button class="setr" style="width:100%;background:none;border:0;color:var(--tx);text-align:left" data-a="go" data-x="smart" data-y="${p.id}"><span style="width:34px;height:34px;border-radius:9px;background:var(--grp2);display:flex;align-items:center;justify-content:center;flex-shrink:0">${I.smart(COLORS[i % COLORS.length])}</span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span style="font-size:14px;font-weight:600">${esc(p.name)}</span><span class="mut ell" style="font-size:12px">${esc(ruleText(p))}</span></span><span class="mut num" style="font-size:15px">${smartIds(p).length}</span>${CHEV}</button>`).join('')}</div></section>` : ''}
     ${list}
   </div>`;
 };
+const CHEV = '<svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="rgba(235,235,245,.3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m1 1 6 6-6 6"/></svg>';
 function ruleText(p) { return [p.folder ? 'pasta ' + p.folder : '', p.max ? 'até ' + p.max + ' min' : '', p.unplayed ? 'não ouvidos' : '', p.started ? 'começados' : '', p.days ? 'parados há ' + p.days + '+ dias' : '', p.recent ? 'últimos ' + p.recent + ' dias' : '', p.dl ? 'baixados' : ''].filter(Boolean).join(' · ') || 'todos os episódios'; }
+const smartMemo = {};
 function smartIds(p) {
-  return Object.keys(db.eps).filter(id => { const e = ep(id), s = sub(e.feed); if (!s) return false;
+  const k = p.id + JSON.stringify(p) + dataVer + ':' + Object.keys(DL).length; if (smartMemo[p.id] && smartMemo[p.id].k === k) return smartMemo[p.id].v;
+  const v = Object.keys(db.eps).filter(id => { const e = ep(id), s = sub(e.feed); if (!s) return false;
     if (p.folder && s.folder !== p.folder) return false; if (p.max && e.dur && e.dur > p.max * 60) return false; if (p.max && !e.dur) return false;
     if (p.unplayed && db.prog[id]) return false; if (p.started && !(posOf(id) > 5)) return false;
     if (p.days && !(db.prog[id] && now() - db.prog[id].t > p.days * 864e5)) return false;
     if (p.recent && e.date < now() - p.recent * 864e5) return false; if (p.dl && !DL[id]) return false; return true;
   }).sort((a, b) => ep(b).date - ep(a).date).slice(0, 100);
+  smartMemo[p.id] = { k, v }; return v;
 }
 V.smart = () => {
   const p = db.smart.find(x => x.id === arg); if (!p) return V.lib();
   const ids = smartIds(p);
   return `<div class="page" style="gap:20px"><button class="ib" data-a="back" aria-label="Voltar">${I.back}</button>
-    <div><h1>${esc(p.name)}</h1><p class="mut" style="margin-top:6px">${esc(ruleText(p))} · ${ids.length} episódios</p></div>
+    <header class="lt"><div><h1>${esc(p.name)}</h1><p class="mut" style="margin-top:6px;font-size:15px">${esc(ruleText(p))} · ${ids.length} episódios</p></div></header>
     <div class="wrapchips"><button class="btn pri" data-a="smartPlay" data-x="${p.id}" ${ids.length ? '' : 'disabled'}>Tocar tudo</button><button class="btn" data-a="smartEdit" data-x="${p.id}">Editar regra</button><button class="btn" data-a="smartDel" data-x="${p.id}">Apagar</button></div>
-    <section>${ids.map(id => epRow(id)).join('') || '<div class="card empty"><span class="mut">Nenhum episódio combina com essa regra agora.</span></div>'}</section></div>`;
+    <section>${ids.length ? `<div class="list">${ids.map(id => epRow(id)).join('')}</div>` : '<div class="card empty"><span>Nenhum episódio combina com essa regra agora.</span></div>'}</section></div>`;
 };
 let showMore = 40;
 let showTab = 'eps', showQ = '', showDesc = false, showSort = 'new';
@@ -826,10 +846,10 @@ function pagedList(list, id) {
 function bigCards(list) {
   return `<div class="hcar">${list.slice(0, 12).map(r => `<div class="bcard"><button class="bart" ${openAttr(r)}>${cov(r.image, r.title, '100%', '12px', 24).replace('width:100%;height:100%', 'width:100%;aspect-ratio:1')}</button>${followBtn(r, 'dplus bplus')}<button class="bt ell" ${openAttr(r)}>${esc(r.title)}</button><span class="mut ell" style="font-size:13px">${esc(r.author || '')}</span></div>`).join('')}</div>`;
 }
-const loadingRow = '<div class="row mut" style="padding:8px 0"><span class="spin"></span> Carregando…</div>';
+const loadingRow = '<div aria-busy="true" aria-label="Carregando">' + [0, 1, 2].map(() => '<div class="skrow"><span class="sk a"></span><span class="b"><i class="sk" style="width:70%"></i><i class="sk" style="width:40%"></i></span></div>').join('') + '</div>';
 V.chart = () => {
   const gid = +arg || 0; loadTop(gid); const l = D.top[gid];
-  return `<div class="page" style="gap:18px"><button class="ib" data-a="back" aria-label="Voltar">${I.back}</button><h1>Em alta${gid ? ' em ' + esc(gName(gid)) : ''}</h1>
+  return `<div class="page" style="gap:18px"><button class="ib" data-a="back" aria-label="Voltar">${I.back}</button><header class="lt"><h1>Em alta${gid ? ' em ' + esc(gName(gid)) : ''}</h1></header>
     <section>${l ? l.map((r, i) => `<div class="row"><span class="trank">${i + 1}</span><div style="flex:1;min-width:0">${resultCard(r)}</div></div>`).join('') || '<p class="mut">Não consegui carregar o ranking agora.</p>' : loadingRow}</section></div>`;
 };
 V.disc = () => {
@@ -837,7 +857,8 @@ V.disc = () => {
   loadTop(g);
   const quick = GENRES.slice(0, 8);
   const head = `<div class="page dpage">
-    <label class="search">${I.search}<span style="position:absolute;width:1px;height:1px;overflow:hidden">Buscar</span><input type="search" id="q" placeholder="Buscar podcasts ou colar link RSS" value="${esc(D.q)}" data-k="search" enterkeyhint="search"></label>
+    <header class="lt"><h1>Descobrir</h1></header>
+    <label class="search" style="margin-top:-18px">${I.search}<span style="position:absolute;width:1px;height:1px;overflow:hidden">Buscar</span><input type="search" id="q" placeholder="Buscar podcasts ou colar link RSS" value="${esc(D.q)}" data-k="search" enterkeyhint="search"></label>
     <div class="chips"><button class="chip ${g ? 'on' : ''}" data-a="cats">${g ? esc(gName(g)) : 'Todas as categorias'} <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${g ? `<button class="chip" data-a="genre" data-x="0">Limpar</button>` : ''}${quick.filter(q => q[0] !== g).map(([id, t]) => `<button class="chip" data-a="genre" data-x="${id}">${t}</button>`).join('')}</div>`;
   if (D.loading || D.res) return head + (D.loading ? '<div class="row mut"><span class="spin"></span> Buscando…</div>' : `<section><div class="sect"><h2>Resultados</h2><button class="link" data-a="clearSearch">Limpar</button></div>${D.res.map(resultCard).join('') || '<p class="mut">Nada encontrado.</p>'}</section>`) + '</div>';
   const top = D.top[g];
@@ -905,7 +926,7 @@ V.stats = () => {
   const delta = period !== 'Tudo' && a.prev ? Math.round((a.s - a.prev) / a.prev * 100) : null;
   const dec = new Date().getMonth() === 11;
   return `<div class="page">
-    <h1>Estatísticas</h1>
+    <header class="lt"><h1>Estatísticas</h1></header>
     <div class="seg" style="max-width:460px">${['Semana', 'Mês', 'Ano', 'Tudo'].map(p => `<button class="${p === period ? 'on' : ''}" data-a="period" data-x="${p}">${p}</button>`).join('')}</div>
     ${!a.s ? '<div class="card empty"><b>Ainda sem dados</b><span class="mut" style="font-size:13px">Ouça alguns episódios e suas estatísticas aparecem aqui.</span></div>' : `
     <div class="bento">
@@ -985,7 +1006,7 @@ V.set = () => {
       row('Transcrição gerada no aparelho', 'Por enquanto, só quando o podcast publica a transcrição', '')
     ]]
   ];
-  return `<div class="page"><h1>Ajustes</h1><div class="sets">${groups.map(([t, rows]) => `<section style="display:flex;flex-direction:column;gap:8px"><h2 class="lbl" style="padding:0 4px">${t}</h2><div class="setg">${rows.join('')}</div></section>`).join('')}</div>
+  return `<div class="page"><header class="lt"><h1>Ajustes</h1></header><div class="sets">${groups.map(([t, rows]) => `<section style="display:flex;flex-direction:column;gap:8px"><h2 class="lbl">${t}</h2><div class="setg">${rows.join('')}</div></section>`).join('')}</div>
     <p class="mut" style="font-size:12px;text-align:center">Podcast ${esc(window.BUILD.v)} · <button class="link" data-a="url" data-x="https://github.com/rafaelpalvador/podcast-app/releases">novidades e downloads</button></p></div>`;
 };
 
@@ -1093,46 +1114,101 @@ async function coverTint(url) {
 }
 
 // ---------------------------------------------------------------- render
+const keyOf = n => n.nodeType === 1 ? n.getAttribute('data-key') : null;
+function morphAttrs(a, b) {
+  for (const at of Array.from(a.attributes)) if (!b.hasAttribute(at.name) && at.name !== 'style' || at.name === 'style' && !b.hasAttribute('style')) a.removeAttribute(at.name);
+  for (const at of Array.from(b.attributes)) if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
+}
+function morphKids(a, b) {
+  const old = Array.from(a.childNodes), nw = Array.from(b.childNodes);
+  const keyed = new Map(); old.forEach(n => { const k = keyOf(n); if (k) keyed.set(k, n); });
+  let oi = 0;
+  for (let i = 0; i < nw.length; i++) {
+    const y = nw[i], k = keyOf(y); let x = null;
+    if (k) { x = keyed.get(k) || null; if (x) keyed.delete(k); }
+    else { while (oi < old.length && (keyOf(old[oi]) || old[oi].__used)) oi++; x = old[oi] || null; if (x) oi++; }
+    if (x && x.nodeType === y.nodeType && x.nodeName === y.nodeName) { x.__used = true; morphNode(x, y); }
+    else x = y;
+    const ref = a.childNodes[i]; if (ref !== x) a.insertBefore(x, ref || null);
+  }
+  while (a.childNodes.length > nw.length) a.removeChild(a.lastChild);
+  Array.from(a.childNodes).forEach(n => { delete n.__used; });
+}
+function morphNode(x, y) {
+  if (x.nodeType === 3 || x.nodeType === 8) { if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; return; }
+  morphAttrs(x, y);
+  if (x.tagName === 'INPUT' || x.tagName === 'TEXTAREA') { if (document.activeElement !== x) { const v = y.getAttribute('value') || ''; if (x.value !== v) x.value = v; } return; }
+  if (x.tagName === 'SVG' || x.tagName === 'svg') { if (x.innerHTML !== y.innerHTML) x.innerHTML = y.innerHTML; return; }
+  morphKids(x, y);
+  if (x.tagName === 'SELECT') { const o = y.querySelector('option[selected]'); if (o && x.value !== o.value) x.value = o.value; }
+}
+function morph(el, html) {
+  if (!el.firstChild) { el.innerHTML = html; return; }
+  const t = document.createElement('template'); t.innerHTML = html; morphKids(el, t.content);
+}
+let lastView = null;
+const NAVT = { home: 'Início', lib: 'Biblioteca', disc: 'Descobrir', stats: 'Estatísticas', set: 'Ajustes' };
+const PUSHED = ['show', 'smart', 'chart'];
+function navTitle() {
+  if (view === 'show') return (sub(arg) || PREV[arg] || META[arg] || {}).title || '';
+  if (view === 'smart') return (db.smart.find(x => x.id === arg) || {}).name || '';
+  if (view === 'chart') return 'Em alta';
+  return NAVT[view] || '';
+}
+function updNav() {
+  const n = $('#nav'); if (!n) return;
+  const lim = view === 'show' ? 380 : 44;
+  n.classList.toggle('show', $('#main').scrollTop > lim && view !== 'player');
+}
+$('#main').addEventListener('scroll', updNav, { passive: true });
 function render() {
   document.documentElement.style.setProperty('--acc', db.set.accent);
   document.body.classList.toggle('glass-on', db.set.glass !== false);
   const v = V[view] ? view : 'home';
-  $('#main').innerHTML = V[v]();
+  const html = V[v]();
+  if (lastView !== v) { $('#main').innerHTML = html; lastView = v; } else morph($('#main'), html);
   $('#main').classList.toggle('tint', v === 'player'); document.body.classList.toggle('pvmode', v === 'player');
   const at = activeTab();
-  $('#side').innerHTML = `<div class="row" style="padding:0 10px 24px;gap:10px">${LOGO(34)}<b style="font-size:20px;letter-spacing:-.03em">Podcast</b></div>
+  morph($('#side'), `<div class="row" style="padding:0 10px 24px;gap:10px">${LOGO(34)}<b style="font-size:20px;letter-spacing:-.03em">Podcast</b></div>
     ${TABS.map(([k, t]) => `<button class="sb ${at === k ? 'on' : ''}" data-a="go" data-x="${k}">${t}${k === 'home' && db.inbox.length ? `<span class="badge">${db.inbox.length}</span>` : ''}</button>`).join('')}
     ${(() => { const fs = [...new Set(Object.values(db.subs).map(s => s.folder).filter(Boolean))].sort(); return fs.length ? '<span class="lbl" style="padding:24px 12px 8px">Pastas</span>' + fs.map(f => `<button class="sb" data-a="folder" data-x="${esc(f)}">${I.folder(colorOf(f))}<span class="ell">${esc(f)}</span></button>`).join('') : ''; })()}
     <span class="lbl" style="padding:20px 12px 8px">Playlists inteligentes</span>
     ${db.smart.map((p, i) => `<button class="sb" data-a="go" data-x="smart" data-y="${p.id}">${I.smart(COLORS[i % COLORS.length])}<span class="ell">${esc(p.name)}</span></button>`).join('')}
-    <button class="card row" style="margin-top:auto;padding:12px;border-radius:16px;color:var(--tx);text-align:left;gap:10px" data-a="go" data-x="set"><span style="width:10px;height:10px;border-radius:5px;background:${GD.on() ? (GD.err ? '#E07A5F' : 'var(--ok)') : '#555'}"></span><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:12px;font-weight:600">${GD.on() ? 'Google Drive' : 'Sem sincronização'}</span><span class="mut ell" style="font-size:11px">${GD.on() ? (GD.busy ? 'Sincronizando…' : GD.last ? 'Sincronizado ' + fmtDate(GD.last).toLowerCase() : 'Conectado') : 'Entrar com Google'}</span></span></button>`;
-  $('#tabbar').innerHTML = TABS.map(([k, t]) => `<button class="tb ${at === k ? 'on' : ''}" data-a="go" data-x="${k}"><span class="tbi">${I.tab[k]}${k === 'home' && db.inbox.length ? '<span class="dot"></span>' : ''}</span>${t}</button>`).join('');
+    <button class="card row" style="margin-top:auto;padding:12px;border-radius:16px;color:var(--tx);text-align:left;gap:10px" data-a="go" data-x="set"><span style="width:10px;height:10px;border-radius:5px;background:${GD.on() ? (GD.err ? '#E07A5F' : 'var(--ok)') : '#555'}"></span><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:12px;font-weight:600">${GD.on() ? 'Google Drive' : 'Sem sincronização'}</span><span class="mut ell" style="font-size:11px">${GD.on() ? (GD.busy ? 'Sincronizando…' : GD.last ? 'Sincronizado ' + fmtDate(GD.last).toLowerCase() : 'Conectado') : 'Entrar com Google'}</span></span></button>`);
+  morph($('#tabbar'), TABS.map(([k, t]) => `<button class="tb ${at === k ? 'on' : ''}" data-a="go" data-x="${k}"><span class="tbi">${I.tab[k]}${k === 'home' && db.inbox.length ? '<span class="dot"></span>' : ''}</span>${t}</button>`).join(''));
   renderBar();
+  morph($('#nav'), `${PUSHED.includes(v) ? `<button class="nb-back" data-a="back" aria-label="Voltar"><svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg></button>` : ''}<b>${esc(navTitle())}</b>`);
+  updNav();
   if (v === 'player') { updBar(); lastCue = -2; lastCh = -2; updLive(); }
 }
 
 // ---------------------------------------------------------------- ações
+// anima a linha saindo antes de mudar a lista (só quando veio de um toque na linha)
+function rowOut(id, b, then) {
+  const row = b && b.closest && b.closest('.sw-row'); if (!row || row.classList.contains('leaving')) return false;
+  hap(10); row.style.maxHeight = row.offsetHeight + 'px'; row.offsetHeight; row.classList.add('leaving');
+  setTimeout(then, 240); return true;
+}
 function moveQ(i, d) { const j = i + d; if (j < 0 || j >= db.queue.length) return; [db.queue[i], db.queue[j]] = [db.queue[j], db.queue[i]]; touch('queueT'); save(); render(); }
 function epInfo(id) {
   const e = ep(id); if (!e) return;
   const inQ = db.queue.includes(id);
-  modal(`<div class="row">${cov(epImg(e), feedTitle(e.feed), '56px', '14px', 12)}<div style="flex:1;min-width:0"><b style="font-size:16px;line-height:1.3;display:block">${esc(e.title)}</b><span class="mut" style="font-size:12px">${esc([feedTitle(e.feed), fmtDate(e.date), fmtD(e.dur)].filter(Boolean).join(' · '))}</span></div></div>
-    <div class="wrapchips"><button class="btn pri" data-a="playgo" data-x="${id}">${I.play} Tocar</button>
-    ${inQ ? `<button class="btn" data-a="qRemove" data-x="${id}">Tirar da fila</button>` : `<button class="btn" data-a="toQueue" data-x="${id}">+ Fila</button><button class="btn" data-a="toNext" data-x="${id}">Tocar a seguir</button>`}
-    ${DL[id] ? `<button class="btn" data-a="dlDel" data-x="${id}">Apagar download</button>` : `<button class="btn" data-a="download" data-x="${id}">${I.dl} Baixar</button>`}
-    <button class="btn" data-a="markDone" data-x="${id}">${isDone(id) ? 'Marcar como não ouvido' : 'Marcar como ouvido'}</button></div>
-    ${e.desc ? `<p class="mut" style="font-size:14px;line-height:1.55;white-space:pre-line">${esc(e.desc)}</p>` : ''}
-    <button class="btn" data-a="close">Fechar</button>`);
+  const act = (a, icon, label, extra) => `<button class="setr sheet-act" data-a="${a}" data-x="${id}">${icon}<span class="tx"><b>${label}</b></span>${extra || ''}</button>`;
+  const ic = d => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  modal(`<div class="row" style="gap:14px;padding:4px 0 4px">${cov(epImg(e), feedTitle(e.feed), '64px', '10px', 12)}<div style="flex:1;min-width:0"><b class="clamp2" style="font-size:17px;line-height:1.25;font-weight:600">${esc(e.title)}</b><span class="mut" style="font-size:13px;display:block;margin-top:3px">${esc([feedTitle(e.feed), fmtDate(e.date), fmtD(e.dur)].filter(Boolean).join(' · '))}</span></div></div>
+    <div class="setg">
+      ${act('playgo', ic('<path d="M7 4.5v15l12.5-7.5z" fill="currentColor" stroke="none"/>'), posOf(id) ? 'Continuar de ' + fmtT(posOf(id)) : 'Tocar')}
+      ${inQ ? act('qRemove', ic('<path d="M4 6h16M4 12h10M4 18h10M16 15l5 5M21 15l-5 5"/>'), 'Tirar da fila') : act('toNext', ic('<path d="M4 6h10M4 12h10M4 18h16M17 5v8M13 9l4-4 4 4"/>'), 'Tocar a seguir') + act('toQueue', ic('<path d="M4 6h16M4 12h16M4 18h10M18 15v6M15 18h6"/>'), 'Adicionar ao fim da fila')}
+      ${DL[id] ? act('dlDel', ic('<path d="M5 7h14M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/>'), 'Apagar download') : act('download', ic('<path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/>'), 'Baixar')}
+      ${act('markDone', ic('<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>'), isDone(id) ? 'Marcar como não ouvido' : 'Marcar como ouvido')}
+      ${act('go', ic('<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>'), 'Ver o podcast', CHEV).replace('data-x="' + id + '"', 'data-x="show" data-y="' + esc(e.feed) + '"')}
+    </div>
+    ${e.desc ? `<p class="sheet-desc">${esc(e.desc)}</p>` : ''}`);
 }
 const ACT = {
-  go: (x, b) => { closeModal(); if (x === 'player') goAnim('player', null, b); else go(x, b.dataset.y != null ? b.dataset.y : null); },
+  go: (x, b) => { closeModal(); if (x === 'player') goAnim('player', null, b); else if (PUSHED.includes(x)) vt('vt-push', () => go(x, b.dataset.y != null ? b.dataset.y : null)); else go(x, b.dataset.y != null ? b.dataset.y : null); },
   back: () => {
-    if (view === 'player' && document.startViewTransition && history.length > 1) {
-      document.documentElement.classList.add('vt-down');
-      const t = document.startViewTransition(() => new Promise(res => { window.addEventListener('popstate', () => { setTimeout(() => { const h = db.cur && document.querySelector('[data-vt="' + db.cur + '"]'); if (h) h.style.viewTransitionName = 'pvart'; res(); }, 0); }, { once: true }); history.back(); }));
-      t.finished.finally(() => { document.documentElement.classList.remove('vt-down'); document.querySelectorAll('[data-vt]').forEach(el => { el.style.viewTransitionName = ''; }); });
-      return;
-    }
+    if (history.length > 1 && (view === 'player' || PUSHED.includes(view))) { popTo(view === 'player' ? 'vt-down' : 'vt-pop'); return; }
     if (history.length > 1) history.back(); else go('home');
   },
   close: closeModal,
@@ -1155,20 +1231,20 @@ const ACT = {
   download: x => download(x),
   dlDel: x => { closeModal(); delDownload(x); },
   markDone: x => { closeModal(); if (isDone(x)) delete db.prog[x]; else { db.prog[x] = { pos: 0, dur: (ep(x) || {}).dur || 0, t: now(), done: true }; db.inbox = db.inbox.filter(y => y !== x); db.queue = db.queue.filter(y => y !== x); touch('inboxT'); touch('queueT'); } save(); render(); },
-  toQueue: x => { closeModal(); db.inbox = db.inbox.filter(y => y !== x); if (!db.queue.includes(x)) db.queue.push(x); touch('inboxT'); touch('queueT'); save(); render(); toast('Adicionado à fila'); },
-  toNext: x => { closeModal(); db.inbox = db.inbox.filter(y => y !== x); db.queue = [x, ...db.queue.filter(y => y !== x)]; touch('inboxT'); touch('queueT'); save(); render(); toast('Toca a seguir'); },
-  archive: x => { db.inbox = db.inbox.filter(y => y !== x); db.archived[x] = now(); touch('inboxT'); save(); render(); },
+  toQueue: (x, b) => { if (rowOut(x, b, () => ACT.toQueue(x))) return; closeModal(); db.inbox = db.inbox.filter(y => y !== x); if (!db.queue.includes(x)) db.queue.push(x); touch('inboxT'); touch('queueT'); save(); render(); toast('Adicionado à fila'); },
+  toNext: (x, b) => { hap(); closeModal(); db.inbox = db.inbox.filter(y => y !== x); db.queue = [x, ...db.queue.filter(y => y !== x)]; touch('inboxT'); touch('queueT'); save(); render(); toast('Toca a seguir'); },
+  archive: (x, b) => { if (rowOut(x, b, () => ACT.archive(x))) return; db.inbox = db.inbox.filter(y => y !== x); db.archived[x] = now(); touch('inboxT'); save(); render(); },
   inboxClear: () => { db.inbox.forEach(x => db.archived[x] = now()); db.inbox = []; touch('inboxT'); save(); render(); toast('Caixa de entrada arquivada'); },
   qUp: x => moveQ(+x, -1), qDown: x => moveQ(+x, 1),
   qDel: x => { db.queue.splice(+x, 1); touch('queueT'); save(); render(); },
-  qRemove: x => { closeModal(); db.queue = db.queue.filter(y => y !== x); touch('queueT'); save(); render(); },
+  qRemove: (x, b) => { if (rowOut(x, b, () => ACT.qRemove(x))) return; closeModal(); db.queue = db.queue.filter(y => y !== x); touch('queueT'); save(); render(); },
   epinfo: x => epInfo(x),
   refresh: () => refreshAll(true),
   refreshOne: async x => { toast('Atualizando…'); try { const n = await refreshFeed(x); save(); render(); toast(n ? n + ' novo(s)' : 'Tudo em dia'); } catch (e) { toast('Erro: ' + e.message); } },
   sub: (x, b) => subscribe(x, b.dataset.y ? { gid: +b.dataset.y } : null),
   subIt: async x => { try { await subscribe(await feedFromItunes(x)); } catch (e) { toast('Não consegui seguir: ' + e.message); } },
-  preview: x => go('show', x),
-  previewIt: x => { go('show', IT2FEED[x] || 'it:' + x); },
+  preview: x => vt('vt-push', () => go('show', x)),
+  previewIt: x => { vt('vt-push', () => go('show', IT2FEED[x] || 'it:' + x)); },
   unsub: x => modal(`<h2>Deixar de seguir?</h2><p class="mut">${esc((sub(x) || {}).title)} sai da biblioteca, da fila e da caixa de entrada. Os downloads são apagados.</p><div class="wrapchips"><button class="btn pri" data-a="unsubYes" data-x="${esc(x)}">Deixar de seguir</button><button class="btn" data-a="close">Cancelar</button></div>`),
   unsubYes: x => { closeModal(); unsubscribe(x); },
   setFolder: x => { const s = sub(x); const fs = [...new Set(Object.values(db.subs).map(y => y.folder).filter(Boolean))]; modal(`<h2>Pasta</h2><input class="txt" id="fname" list="flist" placeholder="Ex.: Tecnologia" value="${esc(s.folder || '')}"><datalist id="flist">${fs.map(f => `<option value="${esc(f)}">`).join('')}</datalist><div class="wrapchips">${fs.map(f => `<button class="chip" data-a="fpick" data-x="${esc(f)}">${esc(f)}</button>`).join('')}</div><div class="wrapchips"><button class="btn pri" data-a="folderSave" data-x="${esc(x)}">Salvar</button>${s.folder ? `<button class="btn" data-a="folderSave" data-x="${esc(x)}" data-y="none">Tirar da pasta</button>` : ''}<button class="btn" data-a="close">Cancelar</button></div>`); },
@@ -1182,7 +1258,7 @@ const ACT = {
   more: () => { showMore += 40; render(); },
   showTab: x => { showTab = x; render(); },
   showDesc: () => { showDesc = !showDesc; render(); },
-  rate: (x, b) => { const s = sub(x); if (!s) return; const n = +b.dataset.y; s.rating = s.rating === n ? 0 : n; s.t = now(); save(); render(); },
+  rate: (x, b) => { hap(6); const s = sub(x); if (!s) return; const n = +b.dataset.y; s.rating = s.rating === n ? 0 : n; s.t = now(); save(); render(); },
   shareFeed: async x => { const t = (sub(x) || PREV[x] || {}).title || 'Podcast'; try { if (navigator.share) { await navigator.share({ title: t, url: x }); return; } } catch (e) { } toast((await copy(x)) ? 'Link do feed copiado' : x, 4000); },
   addRss: () => modal(`<h2>Adicionar por link</h2><p class="mut" style="font-size:13px">Cole o endereço RSS do podcast.</p><input class="txt" id="rssurl" placeholder="https://…" inputmode="url"><div class="wrapchips"><button class="btn pri" data-a="rssGo">Abrir</button><button class="btn" data-a="opmlImport">Importar arquivo XML</button><button class="btn" data-a="close">Cancelar</button></div>`),
   rssGo: () => { const u = $('#rssurl').value.trim(); if (!/^https?:\/\//.test(u)) { toast('Cole um link que comece com http'); return; } closeModal(); go('show', u); },
@@ -1227,7 +1303,56 @@ let swY = null;
 document.addEventListener('touchstart', ev => { if (view === 'player' && ev.target.closest('.pv-top,.pv-art') && $('#main').scrollTop <= 0) swY = ev.touches[0].clientY; else swY = null; }, { passive: true });
 document.addEventListener('touchmove', ev => { if (swY == null) return; const dy = ev.touches[0].clientY - swY; const pv = $('.pv'); if (pv && dy > 0) { pv.style.transform = 'translateY(' + dy * 0.6 + 'px)'; pv.style.opacity = String(1 - Math.min(dy / 900, 0.4)); } }, { passive: true });
 document.addEventListener('touchend', ev => { if (swY == null) return; const dy = (ev.changedTouches[0] || {}).clientY - swY; swY = null; const pv = $('.pv'); if (dy > 130) ACT.back(); else if (pv) { pv.style.transform = ''; pv.style.opacity = ''; } });
-document.addEventListener('click', ev => { const b = ev.target.closest('[data-a]'); if (!b || b.disabled) return; const f = ACT[b.dataset.a]; if (f) { ev.preventDefault(); f(b.dataset.x, b, ev); } });
+let swp = null, swBlock = 0;
+document.addEventListener('pointerdown', ev => {
+  const row = ev.target.closest('.sw-row'); if (!row || ev.button > 0) return;
+  swp = { row, x: ev.clientX, y: ev.clientY, dx: 0, on: false, armed: false, ep: row.querySelector('.ep') };
+}, { passive: true });
+document.addEventListener('pointermove', ev => {
+  if (!swp) return;
+  const dx = ev.clientX - swp.x, dy = ev.clientY - swp.y;
+  if (!swp.on) { if (Math.abs(dy) > 10) { swp = null; return; } if (Math.abs(dx) < 10) return; swp.on = true; swp.ep.style.transition = 'none'; }
+  const w = swp.row.offsetWidth, lim = Math.min(120, w * .3);
+  const d = Math.sign(dx) * Math.min(Math.abs(dx), w * .7) ** .92;
+  swp.dx = dx; swp.ep.style.transform = `translateX(${d}px)`;
+  swp.row.classList.toggle('go-r', dx > 0); swp.row.classList.toggle('go-l', dx < 0);
+  const armed = Math.abs(dx) > lim; if (armed !== swp.armed) { swp.armed = armed; swp.row.classList.toggle('armed', armed); if (armed) hap(6); }
+}, { passive: true });
+function swEnd() {
+  if (!swp) return; const p = swp; swp = null; if (!p.on) return;
+  swBlock = Date.now();
+  if (p.armed) {
+    const act = p.dx > 0 ? p.row.dataset.r : p.row.dataset.l, id = p.row.dataset.sw;
+    p.ep.style.transition = 'transform .22s var(--ease)'; p.ep.style.transform = `translateX(${p.dx > 0 ? '100%' : '-100%'})`;
+    setTimeout(() => { const f = ACT[act]; if (f) f(id, p.row.querySelector('.ep')); }, 140);
+  } else { p.ep.style.transition = 'transform .35s var(--spring)'; p.ep.style.transform = ''; setTimeout(() => p.row.classList.remove('go-r', 'go-l', 'armed'), 300); }
+}
+document.addEventListener('pointerup', swEnd); document.addEventListener('pointercancel', swEnd);
+
+// puxar para atualizar (Início e Biblioteca)
+let ptr = null;
+$('#main').addEventListener('touchstart', ev => { if ((view === 'home' || view === 'lib') && $('#main').scrollTop <= 0 && !refreshing) ptr = { y: ev.touches[0].clientY, d: 0 }; }, { passive: true });
+$('#main').addEventListener('touchmove', ev => {
+  if (!ptr) return; const d = ev.touches[0].clientY - ptr.y; if (d < 0) { ptr = null; return; }
+  ptr.d = d; const el = $('#ptr'); const k = Math.min(1, d / 90);
+  el.style.opacity = k; el.style.transform = `translate(-50%,${-60 + Math.min(d, 110) * .9}px) rotate(${d * 2}deg)`;
+  if (d > 90 && !ptr.armed) { ptr.armed = true; hap(8); }
+}, { passive: true });
+$('#main').addEventListener('touchend', () => {
+  if (!ptr) return; const el = $('#ptr'); const go2 = ptr.armed; ptr = null;
+  el.style.transition = 'transform .35s var(--ease),opacity .35s';
+  if (go2) { el.style.transform = 'translate(-50%,40px)'; refreshAll(true).finally(() => { el.style.opacity = 0; el.style.transform = 'translate(-50%,-60px)'; }); }
+  else { el.style.opacity = 0; el.style.transform = 'translate(-50%,-60px)'; }
+  setTimeout(() => { el.style.transition = ''; }, 400);
+});
+
+// folhas: arrastar para baixo fecha
+let shd = null;
+$('#mbox').addEventListener('touchstart', ev => { if ($('#mbox').scrollTop <= 0) shd = { y: ev.touches[0].clientY, d: 0 }; }, { passive: true });
+$('#mbox').addEventListener('touchmove', ev => { if (!shd) return; const d = ev.touches[0].clientY - shd.y; if (d < 0) { shd.d = 0; return; } shd.d = d; const b = $('#mbox'); b.style.transition = 'none'; b.style.transform = `translateY(${d}px)`; }, { passive: true });
+$('#mbox').addEventListener('touchend', () => { if (!shd) return; const b = $('#mbox'); b.style.transition = ''; if (shd.d > 110) closeModal(); else b.style.transform = ''; shd = null; });
+
+document.addEventListener('click', ev => { if (Date.now() - swBlock < 350 && ev.target.closest('.sw-row')) { ev.preventDefault(); return; } const b = ev.target.closest('[data-a]'); if (!b || b.disabled) return; const f = ACT[b.dataset.a]; if (f) { ev.preventDefault(); f(b.dataset.x, b, ev); } });
 document.addEventListener('change', ev => {
   const el = ev.target; const c = el.dataset.c; if (!c) return;
   if (c === 'set') { const k = el.dataset.k; const v = el.value; db.set[k] = isNaN(+v) || v === '' ? v : +v; touch('setT'); if (NP && (k === 'back' || k === 'fwd')) NP.setSkip(db.set.back * 1000, db.set.fwd * 1000); if (NP && k === 'cont') syncNativeQueue(); if (k === 'speed' && db.cur && !((subOf(db.cur) || {}).ps || {}).speed) A.playbackRate = +v; if (k === 'country') { D.top = {}; D.forYou = null; } save(); render(); }
@@ -1332,7 +1457,7 @@ const GD = (() => {
     for (const [u, s] of Object.entries(R.gone || {})) db.gone[u] = Math.max(db.gone[u] || 0, s);
     for (const [u, s] of Object.entries(R.subs)) { const m = db.subs[u]; if (!m || (s.t || 0) > (m.t || 0)) db.subs[u] = Object.assign({}, m || {}, s, { eps: (m && m.eps) || s.eps || [] }); }
     for (const [u, t] of Object.entries(db.gone)) if (db.subs[u] && (db.subs[u].t || 0) < t) delete db.subs[u];
-    for (const [id, e] of Object.entries(R.eps || {})) if (!db.eps[id]) db.eps[id] = e;
+    for (const [id, e] of Object.entries(R.eps || {})) if (!db.eps[id]) { db.eps[id] = e; epsDirty = true; }
     for (const s of Object.values(db.subs)) if (!s.eps || !s.eps.length) s.eps = Object.values(db.eps).filter(e => e.feed === s.url).sort((a, b) => b.date - a.date).map(e => e.id);
     for (const [id, p] of Object.entries(R.prog || {})) if (!db.prog[id] || (p.t || 0) > (db.prog[id].t || 0)) db.prog[id] = p;
     Object.assign(db.archived, R.archived || {});
@@ -1351,7 +1476,8 @@ const GD = (() => {
     try {
       const id = await fileId();
       if (id) { const r = await call('GET', 'https://www.googleapis.com/drive/v3/files/' + id + '?alt=media'); if (r.status === 200) merge(JSON.parse(r.text || '{}')); else if (r.status === 404) { st.fid = null; } }
-      const payload = JSON.stringify(Object.assign({}, db, { cur: null, v: 1 }));
+      const lite = {}; for (const [k, e] of Object.entries(db.eps)) { const c = Object.assign({}, e); delete c.desc; lite[k] = c; }
+      const payload = JSON.stringify(Object.assign({}, db, { eps: lite, cur: null, v: 2 }));
       if (st.fid) { const r = await call('PATCH', 'https://www.googleapis.com/upload/drive/v3/files/' + st.fid + '?uploadType=media', { 'Content-Type': 'application/json' }, payload); if (r.status >= 300) throw new Error('envio falhou (' + r.status + ')'); }
       else {
         const bd = 'pcb' + rid();
@@ -1373,12 +1499,14 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 window.addEventListener('beforeunload', () => { savePos(); persistNow(); });
 async function loadStore() {
   try {
-    const t = await inv('store_read', { name: 'dados.json' });
+    const [t, te] = await Promise.all([inv('store_read', { name: 'dados.json' }), inv('store_read', { name: 'episodios.json' })]);
     if (t) { const j = JSON.parse(t); const d = JSON.parse(JSON.stringify(DEF)); Object.assign(d, j); d.set = Object.assign({}, DEF.set, j.set || {}); d.lists = Object.assign({}, DEF.lists, j.lists || {}); db = d; }
+    if (te) db.eps = JSON.parse(te); else if (db.eps && Object.keys(db.eps).length) epsDirty = true; // formato antigo: tudo num arquivo só
+    if (!db.eps) db.eps = {};
     storeReady = true;
     const keep = new Set([...db.queue, ...db.inbox, db.cur, ...Object.keys(db.prog), ...db.snips.map(x => x.ep)]);
-    for (const [id, e] of Object.entries(db.eps)) if (!db.subs[e.feed] && !keep.has(id)) delete db.eps[id];
-    if (!t) await persistNow(); // primeira vez: migra o que estava no localStorage
+    for (const [id, e] of Object.entries(db.eps)) if (!db.subs[e.feed] && !keep.has(id)) { delete db.eps[id]; epsDirty = true; }
+    if (!t || epsDirty) await persistNow(); // migra formatos antigos
     localStorage.removeItem('pc:db');
   } catch (e) { storeReady = false; }
 }

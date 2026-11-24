@@ -31,6 +31,12 @@ jobs:
           node -e "const f='src-tauri/tauri.conf.json',j=JSON.parse(require('fs').readFileSync(f,'utf8'));j.version='0.1.${{ github.run_number }}';require('fs').writeFileSync(f,JSON.stringify(j,null,1))"
           sed -i "s|/\*BUILD\*/{v:'dev',d:'',c:''}|{v:'0.1.${{ github.run_number }}',d:'$(date -u +%Y-%m-%dT%H:%M:%SZ)',c:'${GITHUB_SHA::7}'}|" src/index.html
           if [ -n "$GID" ]; then sed -i "s|/\*GOOGLE\*/{id:'',secret:''}|{id:'$GID',secret:'$GSEC'}|" src/index.html && echo "acesso do Google embutido"; fi
+      - name: Fonte Inter (embutida no app)
+        shell: bash
+        run: |
+          mkdir -p src/fonts
+          curl -fsSL -o inter.zip https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip && unzip -j -o inter.zip '*InterVariable.woff2' -d src/fonts || echo "Fonte não baixada; o app usa a fonte do sistema"
+          ls -la src/fonts || true
       - name: Instalar dependências
         run: npm install
       - name: Ícones do app
@@ -78,6 +84,12 @@ jobs:
           node -e "const f='src-tauri/tauri.conf.json',j=JSON.parse(require('fs').readFileSync(f,'utf8'));j.version='0.1.${{ github.run_number }}';require('fs').writeFileSync(f,JSON.stringify(j,null,1))"
           sed -i "s|/\*BUILD\*/{v:'dev',d:'',c:''}|{v:'0.1.${{ github.run_number }}',d:'$(date -u +%Y-%m-%dT%H:%M:%SZ)',c:'${GITHUB_SHA::7}'}|" src/index.html
           if [ -n "$GID" ]; then sed -i "s|/\*GOOGLE\*/{id:'',secret:''}|{id:'$GID',secret:'$GSEC'}|" src/index.html && echo "acesso do Google embutido"; fi
+      - name: Fonte Inter (embutida no app)
+        shell: bash
+        run: |
+          mkdir -p src/fonts
+          curl -fsSL -o inter.zip https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip && unzip -j -o inter.zip '*InterVariable.woff2' -d src/fonts || echo "Fonte não baixada; o app usa a fonte do sistema"
+          ls -la src/fonts || true
       - name: Instalar dependências
         run: npm install
       - name: Gerar projeto Android

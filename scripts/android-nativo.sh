@@ -61,7 +61,7 @@ APP_XML='
 APP_XML="$APP_XML" perl -0pi -e 's#(</application>)#$ENV{APP_XML}$1#' "$M"
 perl -0pi -e 's#(</activity>)#    <meta-data android:name="android.app.shortcuts" android:resource="\@xml/shortcuts" />\n        $1#' "$M"
 perl -0pi -e 's#(<category android:name="android.intent.category.LAUNCHER"\s*/>\s*</intent-filter>)#$1\n            <intent-filter>\n                <action android:name="android.intent.action.VIEW" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <data android:scheme="podcast-app" />\n            </intent-filter>#' "$M"
-for P in INTERNET ACCESS_NETWORK_STATE WAKE_LOCK FOREGROUND_SERVICE FOREGROUND_SERVICE_MEDIA_PLAYBACK POST_NOTIFICATIONS; do
+for P in INTERNET ACCESS_NETWORK_STATE WAKE_LOCK VIBRATE FOREGROUND_SERVICE FOREGROUND_SERVICE_MEDIA_PLAYBACK POST_NOTIFICATIONS; do
   grep -q "android.permission.$P\"" "$M" || perl -0pi -e "s#(<manifest[^>]*>)#\$1\n    <uses-permission android:name=\"android.permission.$P\" />#" "$M"
 done
 echo "--- Manifesto final:"; cat "$M"
