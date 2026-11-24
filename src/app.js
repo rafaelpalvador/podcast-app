@@ -1,5 +1,5 @@
 'use strict';
-/* Podcast — app pessoal de podcast (Tauri 2). Tudo local; sincroniza pelo Google Drive (appDataFolder). */
+/* Podcast — app pessoal de podcast (Tauri 2). Tudo local; sincroniza por um gist secreto no GitHub. */
 
 // ---------------------------------------------------------------- utilidades
 const T = window.__TAURI__;
@@ -105,7 +105,7 @@ function save(noSync) {
   dataVer++;
   clearTimeout(saveT);
   saveT = setTimeout(() => idle(persistNow), 700);
-  if (!noSync) GD.schedule();
+  if (!noSync) SY.schedule();
   if (NP) { clearTimeout(save.w); save.w = setTimeout(pushWidget, 2000); }
 }
 const touch = k => { db.lists[k] = now(); if (k === 'queueT' && NP && db.cur) { clearTimeout(touch.q); touch.q = setTimeout(syncNativeQueue, 300); } };
@@ -609,7 +609,7 @@ V.home = () => {
   return `<div class="page">
     <header class="lt"><div style="flex:1;min-width:0"><span class="sub">${DIAS[d.getDay()]}, ${d.getDate()} de ${['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][d.getMonth()]}</span><h1>${greet()}</h1></div>
       <button class="ib" data-a="go" data-x="disc" aria-label="Buscar">${I.search}</button></header>
-    ${!hasSubs ? `<div class="card" style="display:flex;flex-direction:column;gap:12px;padding:22px"><h2 style="font-size:22px">Comece seguindo seus podcasts</h2><p class="mut" style="line-height:1.5">Busque pelo nome, cole o link RSS ou traga suas inscrições de outro app com um arquivo OPML.</p><div class="wrapchips"><button class="btn pri" data-a="go" data-x="disc">Buscar podcasts</button><button class="btn" data-a="opmlImport">Importar XML / OPML</button>${GD.on() ? '' : '<button class="btn" data-a="go" data-x="set">Entrar com Google</button>'}</div></div>` : ''}
+    ${!hasSubs ? `<div class="card" style="display:flex;flex-direction:column;gap:12px;padding:22px"><h2 style="font-size:22px">Comece seguindo seus podcasts</h2><p class="mut" style="line-height:1.5">Busque pelo nome, cole o link RSS ou traga suas inscrições de outro app com um arquivo OPML.</p><div class="wrapchips"><button class="btn pri" data-a="go" data-x="disc">Buscar podcasts</button><button class="btn" data-a="opmlImport">Importar XML / OPML</button></div></div>` : ''}
     ${ce ? (() => { const dd = durOf(cont), ps = cont === db.cur && A.src ? A.currentTime || posOf(cont) : posOf(cont), tc = tintOf(epImg(ce)), playing = cont === db.cur && !A.paused;
       return `<div class="hero glass" style="${tc ? `background:linear-gradient(135deg,rgba(${tc},.42),rgba(${tc},.10) 75%,#0B0C0F)` : ''}">
       <button class="hero-open" data-a="openPlayer" data-x="${cont}" aria-label="Abrir o player">${cov(epImg(ce), feedTitle(ce.feed), '96px', '18px', 18).replace('<span class="cov"', '<span class="cov" data-vt="' + cont + '"')}
@@ -975,7 +975,7 @@ V.stats = () => {
     </div>
     <section class="card" style="display:flex;flex-direction:column;gap:12px"><h2 style="font-size:16px">Por categoria</h2><div class="bars">${catList.map(([c, s]) => `<div style="width:${s / catTot * 100}%;background:${colorOf(c)}"></div>`).join('')}</div><div class="wrapchips" style="font-size:12px;color:#C7CCD6;gap:14px">${catList.map(([c, s]) => `<span class="row" style="gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:${colorOf(c)}"></span>${esc(c)} · ${Math.round(s / catTot * 100)}%</span>`).join('')}</div></section>`}
     <section style="border-radius:26px;background:#17131F;border:1px solid #2A2238;padding:22px;display:flex;flex-direction:column;gap:8px"><span class="lbl" style="color:#C3A6E6">Retrospectiva ${new Date().getFullYear()}</span><h2 style="font-size:22px">Seu ano em podcasts</h2>${dec ? `<button class="btn pri" style="align-self:flex-start" data-a="wrapped">Ver minha retrospectiva</button>` : `<p style="font-size:13px;color:#B9AFC9;line-height:1.5">Disponível em dezembro: seus programas do ano, quem você mais ouviu e quanto tempo economizou. Tudo calculado no aparelho.</p>`}</section>
-    <p class="mut" style="font-size:12px">As estatísticas ficam nos seus aparelhos e no seu Google Drive. Você pode desligar em Ajustes.</p>
+    <p class="mut" style="font-size:12px">As estatísticas ficam nos seus aparelhos e, se você sincroniza, no seu gist do GitHub. Você pode desligar em Ajustes.</p>
   </div>`;
 };
 
@@ -987,11 +987,12 @@ const act = (label, a, x) => `<button class="btn sm" data-a="${a}" ${x != null ?
 let dlSize = null;
 V.set = () => {
   if (dlSize == null) inv('downloads_size').then(n => { dlSize = n; if (view === 'set') render(); }).catch(() => { dlSize = 0; });
-  const g = GD.on();
+  const g = SY.on();
+  const when = SY.last ? ' · sincronizado ' + fmtDate(SY.last).toLowerCase() + ' às ' + new Date(SY.last).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
   const groups = [
     ['Conta e sincronização', [
-      g ? row('Google Drive', esc(GD.email || 'Conectado') + (GD.last ? ' · sincronizado ' + fmtDate(GD.last) + ' às ' + new Date(GD.last).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '') + (GD.err ? '<br><span style="color:#E07A5F">' + esc(GD.err) + '</span>' : ''), act(GD.busy ? 'Sincronizando…' : 'Sincronizar', 'gdSync')) : row('Entrar com Google', GD.ready() ? 'Guarda inscrições, fila, progresso, momentos e estatísticas numa pasta privada do app no seu Drive. É assim que o celular e o PC ficam iguais.' : 'O acesso do Google ainda não foi configurado nesta versão (veja o README do projeto).', GD.ready() ? act('Entrar', 'gdLogin') : ''),
-      g ? row('Sair da conta', 'Os dados continuam neste aparelho', act('Sair', 'gdLogout')) : ''
+      g ? row('GitHub', esc('@' + (SY.user || '')) + when + (SY.err ? '<br><span style="color:#E07A5F">' + esc(SY.err) + '</span>' : ''), act(SY.busy ? 'Sincronizando…' : 'Sincronizar', 'syNow')) : row('Sincronizar pelo GitHub', 'Guarda inscrições, fila, progresso, momentos e estatísticas num gist secreto da sua conta. É assim que o celular e o PC ficam iguais.', act('Conectar', 'syConnect')),
+      g ? row('Desconectar', 'Os dados continuam neste aparelho e no gist', act('Desconectar', 'syLogout')) : ''
     ]],
     ['Reprodução', [
       row('Velocidade padrão', 'Cada podcast pode ter a sua', sel('speed', [0.8, 1, 1.1, 1.2, 1.3, 1.5, 1.7, 2, 2.5, 3].map(v => [v, String(v).replace('.', ',') + '×']))),
@@ -1205,7 +1206,7 @@ function render() {
     ${(() => { const fs = [...new Set(Object.values(db.subs).map(s => s.folder).filter(Boolean))].sort(); return fs.length ? '<span class="lbl" style="padding:24px 12px 8px">Pastas</span>' + fs.map(f => `<button class="sb" data-a="folder" data-x="${esc(f)}">${I.folder(colorOf(f))}<span class="ell">${esc(f)}</span></button>`).join('') : ''; })()}
     <span class="lbl" style="padding:20px 12px 8px">Playlists inteligentes</span>
     ${db.smart.map((p, i) => `<button class="sb" data-a="go" data-x="smart" data-y="${p.id}">${I.smart(COLORS[i % COLORS.length])}<span class="ell">${esc(p.name)}</span></button>`).join('')}
-    <button class="card row" style="margin-top:auto;padding:12px;border-radius:16px;color:var(--tx);text-align:left;gap:10px" data-a="go" data-x="set"><span style="width:10px;height:10px;border-radius:5px;background:${GD.on() ? (GD.err ? '#E07A5F' : 'var(--ok)') : '#555'}"></span><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:12px;font-weight:600">${GD.on() ? 'Google Drive' : 'Sem sincronização'}</span><span class="mut ell" style="font-size:11px">${GD.on() ? (GD.busy ? 'Sincronizando…' : GD.last ? 'Sincronizado ' + fmtDate(GD.last).toLowerCase() : 'Conectado') : 'Entrar com Google'}</span></span></button>`);
+    <button class="card row" style="margin-top:auto;padding:12px;border-radius:16px;color:var(--tx);text-align:left;gap:10px" data-a="go" data-x="set"><span style="width:10px;height:10px;border-radius:5px;background:${SY.on() ? (SY.err ? '#E07A5F' : 'var(--ok)') : '#555'}"></span><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:12px;font-weight:600">${SY.on() ? 'GitHub' : 'Sem sincronização'}</span><span class="mut ell" style="font-size:11px">${SY.on() ? (SY.busy ? 'Sincronizando…' : SY.last ? 'Sincronizado ' + fmtDate(SY.last).toLowerCase() : 'Conectado') : 'Sincronizar pelo GitHub'}</span></span></button>`);
   morph($('#tabbar'), TABS.map(([k, t]) => `<button class="tb ${at === k ? 'on' : ''}" data-a="go" data-x="${k}"><span class="tbi">${I.tab[k]}${k === 'home' && db.inbox.length ? '<span class="dot"></span>' : ''}</span>${t}</button>`).join(''));
   renderBar();
   morph($('#nav'), `${PUSHED.includes(v) ? `<button class="nb-back" data-a="back" aria-label="Voltar"><svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg></button>` : ''}<b>${esc(navTitle())}</b>`);
@@ -1312,7 +1313,7 @@ const ACT = {
   accent: x => { db.set.accent = x; touch('setT'); save(); render(); },
   dlClear: async () => { for (const id of Object.keys(DL)) await delDownload(id, true); dlSize = null; render(); toast('Downloads apagados'); },
   statsClear: () => { db.stats = {}; save(); render(); toast('Estatísticas apagadas'); },
-  wipe: () => modal(`<h2>Apagar todos os dados?</h2><p class="mut">Isso apaga tudo deste aparelho. Se você usa o Google Drive, os dados de lá continuam e voltam ao entrar de novo.</p><div class="wrapchips"><button class="btn pri" data-a="wipeYes">Apagar tudo</button><button class="btn" data-a="close">Cancelar</button></div>`),
+  wipe: () => modal(`<h2>Apagar todos os dados?</h2><p class="mut">Isso apaga tudo deste aparelho. Se você sincroniza pelo GitHub, os dados do gist continuam e voltam ao conectar de novo.</p><div class="wrapchips"><button class="btn pri" data-a="wipeYes">Apagar tudo</button><button class="btn" data-a="close">Cancelar</button></div>`),
   wipeYes: async () => { await ACT.dlClear(); storeReady = false; await inv('store_write', { name: 'dados.json', text: '{}' }).catch(() => { }); localStorage.removeItem('pc:db'); localStorage.removeItem('pc:gd'); location.hash = ''; location.reload(); },
   opmlImport: () => modal(`<h2>Importar XML de podcasts</h2><p class="mut" style="font-size:13px;line-height:1.5">Aceita a <b>lista de inscrições</b> exportada de outro app (OPML / XML do AntennaPod, Pocket Casts, Podcast Addict, Apple Podcasts…) e também o <b>XML (RSS) de um podcast</b>. Pode escolher vários arquivos de uma vez ou colar o conteúdo.</p><input type="file" multiple accept=".opml,.xml,.rss,text/xml,application/xml,application/rss+xml,text/x-opml" id="opmlfile" class="txt" style="padding:8px;height:auto"><textarea class="txt" id="opmltext" placeholder="…ou cole o XML aqui"></textarea><div class="wrapchips"><button class="btn pri" data-a="opmlGo">Importar</button><button class="btn" data-a="close">Cancelar</button></div>`),
   opmlGo: async () => { const fs = Array.from($('#opmlfile').files || []); const texts = fs.length ? await Promise.all(fs.map(f => f.text())) : [$('#opmltext').value]; closeModal(); for (const t of texts) await importXml(t); },
@@ -1322,7 +1323,8 @@ const ACT = {
   smartEdit: x => smartEditor(db.smart.find(y => y.id === x)),
   smartDel: x => { db.smart = db.smart.filter(y => y.id !== x); touch('smartT'); save(); go('lib'); },
   smartSave: x => { const p = x ? db.smart.find(y => y.id === x) : { id: rid() }; Object.assign(p, { name: $('#sm_name').value.trim() || 'Minha playlist', max: +$('#sm_max').value || 0, folder: $('#sm_folder').value, unplayed: $('#sm_un').checked, started: $('#sm_st').checked, dl: $('#sm_dl').checked, recent: +$('#sm_rec').value || 0, days: 0 }); if (!x) db.smart.push(p); touch('smartT'); closeModal(); save(); render(); },
-  gdLogin: () => GD.login(), gdLogout: () => GD.logout(), gdSync: () => GD.sync(true)
+  syConnect: () => modal(`<h2>Sincronizar pelo GitHub</h2><p class="mut" style="font-size:14px;line-height:1.55">1. Crie um token no GitHub só com a permissão <b>gist</b> (o link já abre com ela marcada). Em <i>Expiration</i>, escolha <b>No expiration</b> para não precisar refazer.<br>2. Copie o token e cole aqui. Faça o mesmo no outro aparelho, com o mesmo token ou um novo.</p><p class="mut" style="font-size:13px;line-height:1.5">Os dados ficam num gist <b>secreto</b> da sua conta. O token fica só neste aparelho e não dá acesso aos seus repositórios.</p><button class="btn" data-a="url" data-x="https://github.com/settings/tokens/new?scopes=gist&amp;description=Podcast%20app">Criar token no GitHub</button><input class="txt" id="ghtok" type="password" autocomplete="off" placeholder="ghp_…"><div class="wrapchips"><button class="btn pri" data-a="syGo">Conectar</button><button class="btn" data-a="close">Cancelar</button></div>`),
+  syGo: () => SY.connect(($('#ghtok') || {}).value), syLogout: () => SY.logout(), syNow: () => SY.sync(true)
 };
 function ccSheet() {
   const mine = myCountries();
@@ -1454,55 +1456,48 @@ function exportOpml() {
   return '<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0"><head><title>Podcast — inscrições</title></head><body>\n' + Object.values(db.subs).filter(s => !s.local).map(s => `  <outline type="rss" text="${x(s.title)}" title="${x(s.title)}" xmlUrl="${x(s.url)}"/>`).join('\n') + '\n</body></opml>\n';
 }
 
-// ---------------------------------------------------------------- Google Drive (pasta privada do app)
-const GD = (() => {
-  const K = 'pc:gd';
+// ---------------------------------------------------------------- GitHub (gist secreto)
+// Sincroniza por um gist secreto na conta do GitHub, com um token que só tem acesso a gists.
+const SY = (() => {
+  const K = 'pc:gh', FILE = 'podcast-dados.json', DESC = 'Podcast — sincronização do app (não apagar)';
   let st = {}; try { st = JSON.parse(localStorage.getItem(K) || '{}'); } catch (e) { }
-  const persist = () => localStorage.setItem(K, JSON.stringify({ tok: st.tok, email: st.email, last: st.last, fid: st.fid }));
-  const client = () => { try { const c = JSON.parse(localStorage.getItem('pc:gclient') || 'null'); if (c && c.id) return c; } catch (e) { } return window.GOOGLE || {}; };
-  const form = o => Object.entries(o).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
-  const b64u = a => btoa(String.fromCharCode(...a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const persist = () => localStorage.setItem(K, JSON.stringify({ tok: st.tok, user: st.user, last: st.last, gid: st.gid }));
   const api = {
-    get email() { return st.email; }, get last() { return st.last; }, get err() { return st.err; }, get busy() { return st.busy; },
-    on: () => !!st.tok, ready: () => !!client().id
+    get user() { return st.user; }, get last() { return st.last; }, get err() { return st.err; }, get busy() { return st.busy; },
+    on: () => !!st.tok
   };
-  async function login() {
-    const c = client(); if (!c.id) { toast('Acesso do Google não configurado'); return; }
-    const ver = b64u(crypto.getRandomValues(new Uint8Array(48))), chal = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ver)))), state = b64u(crypto.getRandomValues(new Uint8Array(12)));
-    const port = await inv('oauth_listen'), redir = 'http://127.0.0.1:' + port;
-    const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + form({ client_id: c.id, redirect_uri: redir, response_type: 'code', scope: 'openid email https://www.googleapis.com/auth/drive.appdata', code_challenge: chal, code_challenge_method: 'S256', access_type: 'offline', prompt: 'consent', state });
-    try { await openUrl(url); } catch (e) { toast('Não consegui abrir o navegador'); return; }
-    toast('Entre na sua conta Google no navegador e volte para cá', 5000);
-    let got = null; for (let i = 0; i < 600 && !got; i++) { await new Promise(r => setTimeout(r, 1000)); try { got = await inv('oauth_poll'); } catch (e) { } }
-    if (!got) { toast('O login não terminou (tempo esgotado)'); return; }
-    const q = new URLSearchParams(got.split('?')[1] || ''); if (q.get('error')) { toast('Login cancelado'); return; } if (q.get('state') !== state) { toast('Resposta de login inválida'); return; }
-    const r = await http('POST', 'https://oauth2.googleapis.com/token', { 'Content-Type': 'application/x-www-form-urlencoded' }, form({ code: q.get('code'), client_id: c.id, client_secret: c.secret || '', redirect_uri: redir, grant_type: 'authorization_code', code_verifier: ver }));
-    const j = JSON.parse(r.text || '{}'); if (!j.refresh_token) { toast('O Google não autorizou: ' + (j.error_description || j.error || r.status), 5000); return; }
-    st.tok = { rt: j.refresh_token, at: j.access_token, exp: now() + (j.expires_in - 60) * 1000 };
-    try { const pl = JSON.parse(atob(j.id_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); st.email = pl.email || ''; } catch (e) { }
-    st.fid = null; persist(); render(); toast('Conectado como ' + (st.email || 'sua conta Google')); sync(true);
-  }
-  function logout() { st = {}; persist(); render(); toast('Você saiu da conta Google'); }
-  async function token(force) {
-    if (!st.tok) throw new Error('entre na sua conta de novo');
-    if (!force && st.tok.at && now() < st.tok.exp) return st.tok.at;
-    const c = client();
-    const r = await http('POST', 'https://oauth2.googleapis.com/token', { 'Content-Type': 'application/x-www-form-urlencoded' }, form({ refresh_token: st.tok.rt, client_id: c.id, client_secret: c.secret || '', grant_type: 'refresh_token' }));
-    const j = JSON.parse(r.text || '{}');
-    if (!j.access_token) { if (j.error === 'invalid_grant') { st.tok = null; persist(); render(); throw new Error('o acesso expirou, entre de novo'); } throw new Error('sem conexão (' + (j.error || r.status) + ')'); }
-    st.tok.at = j.access_token; st.tok.exp = now() + (j.expires_in - 60) * 1000; persist(); return st.tok.at;
-  }
-  async function call(method, url, headers, body) {
-    let t = await token(); let r = await http(method, url, Object.assign({ Authorization: 'Bearer ' + t }, headers || {}), body);
-    if (r.status === 401) { t = await token(true); r = await http(method, url, Object.assign({ Authorization: 'Bearer ' + t }, headers || {}), body); }
+  async function call(method, path, body) {
+    const r = await http(method, path.startsWith('http') ? path : 'https://api.github.com' + path, Object.assign({ Authorization: 'Bearer ' + st.tok, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, body != null ? { 'Content-Type': 'application/json' } : {}), body != null ? JSON.stringify(body) : null);
+    if (r.status === 401) { st.tok = null; persist(); render(); throw new Error('o token não vale mais, conecte de novo'); }
     return r;
   }
-  const NAME = 'podcast-dados.json';
-  async function fileId() {
-    if (st.fid) return st.fid;
-    const r = await call('GET', 'https://www.googleapis.com/drive/v3/files?' + form({ spaces: 'appDataFolder', q: "name='" + NAME + "'", fields: 'files(id)' }));
-    if (r.status !== 200) throw new Error('Drive respondeu ' + r.status);
-    const f = (JSON.parse(r.text).files || [])[0]; st.fid = f ? f.id : null; persist(); return st.fid;
+  async function connect(tok) {
+    tok = (tok || '').trim(); if (!tok) { toast('Cole o token do GitHub'); return; }
+    st.tok = tok;
+    try {
+      const r = await call('GET', '/user'); if (r.status !== 200) throw new Error('GitHub respondeu ' + r.status);
+      const sc = (r.headers['x-oauth-scopes'] || r.headers['X-OAuth-Scopes'] || '');
+      if (sc && !/\bgist\b/.test(sc)) throw new Error('o token precisa da permissão "gist"');
+      st.user = JSON.parse(r.text).login; st.gid = null; persist(); closeModal(); render(); toast('Conectado como ' + st.user); sync(true);
+    } catch (e) { st.tok = null; persist(); toast('Não conectei: ' + e.message, 5000); }
+  }
+  function logout() { st = {}; persist(); render(); toast('GitHub desconectado'); }
+  async function gistId() {
+    if (st.gid) return st.gid;
+    for (let pg = 1; pg <= 5; pg++) {
+      const r = await call('GET', '/gists?per_page=100&page=' + pg); if (r.status !== 200) throw new Error('GitHub respondeu ' + r.status);
+      const L = JSON.parse(r.text || '[]'); const g = L.find(x => x.files && x.files[FILE]);
+      if (g) { st.gid = g.id; persist(); return g.id; }
+      if (L.length < 100) break;
+    }
+    return null;
+  }
+  // Só o que não se recupera dos feeds: episódios em uso (fila, caixa, progresso, momentos)
+  function payload() {
+    const keep = new Set([...db.queue, ...db.inbox, ...Object.keys(db.prog), ...db.snips.map(x => x.ep)]);
+    const eps = {}; keep.forEach(id => { const e = db.eps[id]; if (e) { const c = Object.assign({}, e); delete c.desc; eps[id] = c; } });
+    const subs = {}; for (const [u, x] of Object.entries(db.subs)) { const c = Object.assign({}, x); c.eps = []; subs[u] = c; }
+    return JSON.stringify(Object.assign({}, db, { eps, subs, cur: null, v: 3 }));
   }
   function merge(R) {
     if (!R || !R.subs) return;
@@ -1526,28 +1521,30 @@ const GD = (() => {
   async function sync(manual) {
     if (!st.tok || st.busy) return; st.busy = true; st.err = ''; if (view === 'set') render();
     try {
-      const id = await fileId();
-      if (id) { const r = await call('GET', 'https://www.googleapis.com/drive/v3/files/' + id + '?alt=media'); if (r.status === 200) merge(JSON.parse(r.text || '{}')); else if (r.status === 404) { st.fid = null; } }
-      const lite = {}; for (const [k, e] of Object.entries(db.eps)) { const c = Object.assign({}, e); delete c.desc; lite[k] = c; }
-      const payload = JSON.stringify(Object.assign({}, db, { eps: lite, cur: null, v: 2 }));
-      if (st.fid) { const r = await call('PATCH', 'https://www.googleapis.com/upload/drive/v3/files/' + st.fid + '?uploadType=media', { 'Content-Type': 'application/json' }, payload); if (r.status >= 300) throw new Error('envio falhou (' + r.status + ')'); }
-      else {
-        const bd = 'pcb' + rid();
-        const body = '--' + bd + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify({ name: NAME, parents: ['appDataFolder'] }) + '\r\n--' + bd + '\r\nContent-Type: application/json\r\n\r\n' + payload + '\r\n--' + bd + '--';
-        const r = await call('POST', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', { 'Content-Type': 'multipart/related; boundary=' + bd }, body);
-        if (r.status >= 300) throw new Error('envio falhou (' + r.status + ')'); st.fid = JSON.parse(r.text).id;
+      let id = await gistId();
+      if (id) {
+        const r = await call('GET', '/gists/' + id);
+        if (r.status === 404) { st.gid = id = null; }
+        else if (r.status === 200) {
+          const f = (JSON.parse(r.text).files || {})[FILE];
+          if (f) { const txt = f.truncated ? (await call('GET', f.raw_url)).text : f.content; merge(JSON.parse(txt || '{}')); }
+        } else throw new Error('leitura falhou (' + r.status + ')');
       }
+      const files = { [FILE]: { content: payload() } };
+      const r = id ? await call('PATCH', '/gists/' + id, { files }) : await call('POST', '/gists', { description: DESC, public: false, files });
+      if (r.status >= 300) throw new Error('envio falhou (' + r.status + ')');
+      if (!id) { st.gid = JSON.parse(r.text).id; }
       st.last = now(); persist(); persistNow(); if (manual) toast('Sincronizado');
     } catch (e) { st.err = 'Erro: ' + e.message; if (manual) toast('Sincronização: ' + e.message, 4000); }
     st.busy = false; render();
   }
   let sT;
   const schedule = () => { if (!st.tok) return; clearTimeout(sT); sT = setTimeout(() => sync(false), 45000); };
-  return Object.assign(api, { login, logout, sync, schedule });
+  return Object.assign(api, { connect, logout, sync, schedule });
 })();
 
 // ---------------------------------------------------------------- início
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && NP) { A.poll(); ingestListen(); podAction(); render(); } if (document.visibilityState === 'hidden') { savePos(); persistNow(); if (GD.on()) GD.sync(false); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && NP) { A.poll(); ingestListen(); podAction(); render(); } if (document.visibilityState === 'hidden') { savePos(); persistNow(); if (SY.on()) SY.sync(false); } });
 window.addEventListener('beforeunload', () => { savePos(); persistNow(); });
 async function loadStore() {
   try {
@@ -1578,7 +1575,7 @@ async function loadStore() {
     if (DL[db.cur]) inv('download_path', { name: fileName(e) }).then(p => { if (p && A.paused) { A.src = T.core.convertFileSrc(p); pendingSeek = posOf(db.cur); } }).catch(() => { });
     renderBar();
   }
-  if (GD.on()) await GD.sync(false);
+  if (SY.on()) await SY.sync(false);
   if (db.set.refreshStart && Object.keys(db.subs).length) refreshAll(false);
   setInterval(() => { if (Object.keys(db.subs).length) refreshAll(false); }, 2 * 3600 * 1000);
 })();

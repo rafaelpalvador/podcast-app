@@ -2,7 +2,7 @@
 
 <h1 align="center">Podcast</h1>
 
-<p align="center">App de podcast pessoal, local-first, para <b>Android</b> e <b>Windows 11</b>, com sincronização pelo Google Drive e sem servidor próprio.</p>
+<p align="center">App de podcast pessoal, local-first, para <b>Android</b> e <b>Windows 11</b>, com sincronização opcional pelo GitHub e sem servidor próprio.</p>
 
 ---
 
@@ -15,14 +15,14 @@ Links fixos, sempre a versão mais nova:
 
 Cada envio para o branch `main` compila de novo os dois (GitHub Actions) e substitui a versão em *Releases*.
 
-## Login com Google (sincronização)
+## Sincronização (opcional, pelo GitHub)
 
-Para o botão "Entrar com Google" funcionar, o repositório precisa de dois *secrets* em **Settings → Secrets and variables → Actions**:
+Não há login com Google. Para deixar o celular e o PC iguais, o app usa um **gist secreto** na sua conta do GitHub:
 
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
+1. Em **Ajustes → Sincronizar pelo GitHub → Conectar**, toque em **Criar token no GitHub**. O link já abre com só a permissão `gist` marcada; em *Expiration*, escolha *No expiration*.
+2. Copie o token, cole no app e conecte. Repita no outro aparelho.
 
-Pode ser o mesmo cliente OAuth "App para computador" usado no Marginália Notes, com a **Google Drive API** ativada no projeto. O app usa só o escopo `drive.appdata`: uma pasta privada e escondida do app no seu Drive, sem acesso aos seus outros arquivos.
+O app cria o gist `podcast-dados.json` na primeira vez e depois sincroniza sozinho (ao sair do app e uns segundos depois de cada mudança). O token fica só no aparelho e não dá acesso aos seus repositórios. Sem conectar, o app funciona normalmente, só no aparelho.
 
 ## O que já funciona (versão 0.1)
 
@@ -33,7 +33,7 @@ Pode ser o mesmo cliente OAuth "App para computador" usado no Marginália Notes,
 - Downloads para ouvir offline
 - Momentos salvos com exportação em Markdown
 - Estatísticas (quando, o que e de quem você ouviu, tempo economizado) e sugestões por categoria
-- Sincronização entre celular e PC pelo Google Drive
+- Sincronização opcional entre celular e PC por um gist secreto do GitHub
 
 - **Android:** player nativo com notificação de mídia, controles na tela bloqueada, na cápsula do Honor e no fone; 3 widgets (player, mini player, semana e caixa de entrada) e atalhos ao segurar o ícone
 
@@ -49,7 +49,7 @@ Pode ser o mesmo cliente OAuth "App para computador" usado no Marginália Notes,
 
 Um app só, com a mesma interface no celular e no PC. Abaixo de 900 px de largura ele vira layout de celular (abas embaixo e mini player). Acima disso, mostra barra lateral e player completo.
 
-Seus dados (inscrições, fila, progresso, momentos salvos, estatísticas e ajustes) ficam numa pasta privada do app no **seu** Google Drive (`appDataFolder`). Não existe servidor no meio, e o app também funciona sem conta, só no aparelho.
+Seus dados (inscrições, fila, progresso, momentos salvos, estatísticas e ajustes) ficam no aparelho. Se quiser, eles também vão para um gist secreto na **sua** conta do GitHub para sincronizar. Não existe servidor no meio.
 
 ## Telas
 
@@ -84,14 +84,14 @@ Seus dados (inscrições, fila, progresso, momentos salvos, estatísticas e ajus
 
 - **App:** [Tauri 2](https://tauri.app), uma base de código para Android e Windows
 - **Busca e catálogo:** [Podcast Index API](https://podcastindex.org) e iTunes Search API
-- **Sync:** Google Drive API (`appDataFolder`), login com Google via OAuth
+- **Sync:** GitHub Gists API (gist secreto, token só com a permissão `gist`)
 - **Importar/exportar:** OPML
 
 ## Estrutura
 
 ```
 src/                 interface do app (HTML, CSS e JavaScript, sem etapa de build)
-src-tauri/           parte nativa em Rust (rede, downloads, login do Google)
+src-tauri/           parte nativa em Rust (rede, downloads, arquivos)
 .github/workflows/   compilação do APK e do instalador do Windows
 android-assinatura/  chave que assina o APK
 assets/logo/         logo em SVG
