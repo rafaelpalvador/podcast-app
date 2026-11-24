@@ -755,7 +755,7 @@ V.show = () => {
   } else if (showTab === 'like') {
     const gid = (s && subGenre(s)) || CATMAP[(p.cat || '').toLowerCase()];
     if (!gid) body = '<p class="mut" style="padding:12px 0">Não sei a categoria deste podcast para sugerir parecidos.</p>';
-    else { loadTop(gid); const l = D.top[gid]; body = l ? (l.filter(r => !isFollowing(r) && (r.title || '').toLowerCase() !== (p.title || '').toLowerCase()).slice(0, 12).map(resultCard).join('') || '<p class="mut">Nada novo por aqui.</p>') : loadingRow; }
+    else { loadTop(gid); const l = D.top[tk(gid)]; body = l ? (l.filter(r => !isFollowing(r) && (r.title || '').toLowerCase() !== (p.title || '').toLowerCase()).slice(0, 12).map(resultCard).join('') || '<p class="mut">Nada novo por aqui.</p>') : loadingRow; }
   } else {
     const sn = db.snips.filter(x => x.feed === url);
     body = sn.length ? `<div class="hscroll" style="flex-direction:column">${sn.map(x => snipCard(x).replace('flex:0 0 260px', 'width:100%')).join('')}</div>` : '<p class="mut" style="padding:12px 0">Nenhum momento salvo deste podcast ainda. No player, toque no marcador para guardar um trecho.</p>';
@@ -803,18 +803,27 @@ async function itunesSearch(q) {
   const out = (j.results || []).filter(r => r.feedUrl).map(r => ({ feed: r.feedUrl, title: r.collectionName, author: r.artistName, image: r.artworkUrl600 || r.artworkUrl100, cat: r.primaryGenreName, gid: (r.genreIds || [])[0] }));
   out.forEach(r => { META[r.feed] = { title: r.title, image: r.image, author: r.author }; }); return out;
 }
+// Países onde o Apple Podcasts tem catálogo e rankings
+const CCS = 'ae ag ai al am ao ar at au az bb be bf bg bh bj bm bn bo br bs bt bw by bz ca cg ch ci cl cm cn co cr cv cy cz de dk dm do dz ec ee eg es fi fj fm fr ga gb gd ge gh gm gr gt gw gy hk hn hr hu id ie il in iq is it jm jo jp ke kg kh kn kr kw ky kz la lb lc lk lr lt lu lv ly ma md me mg mk ml mn mo mr ms mt mu mv mw mx my mz na ne ng ni nl no np nr nz om pa pe pg ph pk pl pt pw py qa ro rs ru rw sa sb sc se sg si sk sl sn sr st sv sz tc td th tj tm tn to tr tt tw tz ua ug us uy uz vc ve vg vn vu xk ye za zm zw'.split(' ');
+const ccNamer = (() => { try { return new Intl.DisplayNames(['pt-BR'], { type: 'region' }); } catch (e) { return null; } })();
+const ccName = c => { try { return (ccNamer && ccNamer.of(c.toUpperCase())) || c.toUpperCase(); } catch (e) { return c.toUpperCase(); } };
+const CC_SORTED = CCS.map(c => [c, ccName(c)]).sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+const myCountries = () => { const l = (db.set.countries || []).filter(c => CCS.includes(c)); return l.length ? l : [db.set.country || 'br']; };
+const curCC = () => { const l = myCountries(); return D.cc && l.includes(D.cc) ? D.cc : (l.includes(db.set.country) ? db.set.country : l[0]); };
+const tk = gid => curCC() + ':' + gid;
 async function topChart(gid) {
-  if (D.top[gid]) return D.top[gid];
+  const cc = curCC(), key = cc + ':' + gid;
+  if (D.top[key]) return D.top[key];
   let list = [];
   try {
-    const j = await getJSON('https://itunes.apple.com/' + db.set.country + '/rss/toppodcasts/limit=40' + (gid ? '/genre=' + gid : '') + '/json');
+    const j = await getJSON('https://itunes.apple.com/' + cc + '/rss/toppodcasts/limit=40' + (gid ? '/genre=' + gid : '') + '/json');
     list = ((j.feed && j.feed.entry) || []).map(e => ({ itunesId: e.id && e.id.attributes && e.id.attributes['im:id'], title: e['im:name'] && e['im:name'].label, author: e['im:artist'] && e['im:artist'].label, image: e['im:image'] && e['im:image'][e['im:image'].length - 1].label.replace(/\d+x\d+bb/, '600x600bb'), summary: e.summary && e.summary.label || '', cat: e.category && e.category.attributes && e.category.attributes.label || '' }));
   } catch (e) { }
-  if (!list.length && !gid) { try { const j = await getJSON('https://rss.applemarketingtools.com/api/v2/' + db.set.country + '/podcasts/top/40/podcasts.json'); list = ((j.feed && j.feed.results) || []).map(r => ({ itunesId: r.id, title: r.name, author: r.artistName, image: (r.artworkUrl100 || '').replace('100x100', '600x600') })); } catch (e) { } }
+  if (!list.length && !gid) { try { const j = await getJSON('https://rss.applemarketingtools.com/api/v2/' + cc + '/podcasts/top/40/podcasts.json'); list = ((j.feed && j.feed.results) || []).map(r => ({ itunesId: r.id, title: r.name, author: r.artistName, image: (r.artworkUrl100 || '').replace('100x100', '600x600') })); } catch (e) { } }
   list.forEach(r => { if (r.itunesId) META['it:' + r.itunesId] = { title: r.title, image: r.image, author: r.author }; });
-  D.top[gid] = list; return list;
+  D.top[key] = list; return list;
 }
-function loadTop(gid) { if (D.top[gid] || D.loadingTop[gid]) return; D.loadingTop[gid] = true; topChart(gid).then(() => { D.loadingTop[gid] = false; if (view === 'disc' || view === 'chart') render(); }); }
+function loadTop(gid) { const key = tk(gid); if (D.top[key] || D.loadingTop[key]) return; D.loadingTop[key] = true; topChart(gid).then(() => { D.loadingTop[key] = false; if (view === 'disc' || view === 'chart') render(); }); }
 async function feedFromItunes(id) { const j = await getJSON('https://itunes.apple.com/lookup?id=' + id); const r = (j.results || [])[0]; if (!r || !r.feedUrl) throw new Error('feed não encontrado'); return r.feedUrl; }
 function listenBy() { const L = {}; for (const dev of Object.values(db.stats)) for (const d of Object.values(dev.days || {})) for (const [f, s] of Object.entries(d.f || {})) L[f] = (L[f] || 0) + s; return L; }
 const subGenre = s => s.gid || CATMAP[(s.cat || '').toLowerCase()];
@@ -848,7 +857,7 @@ function bigCards(list) {
 }
 const loadingRow = '<div aria-busy="true" aria-label="Carregando">' + [0, 1, 2].map(() => '<div class="skrow"><span class="sk a"></span><span class="b"><i class="sk" style="width:70%"></i><i class="sk" style="width:40%"></i></span></div>').join('') + '</div>';
 V.chart = () => {
-  const gid = +arg || 0; loadTop(gid); const l = D.top[gid];
+  const gid = +arg || 0; loadTop(gid); const l = D.top[tk(gid)];
   return `<div class="page" style="gap:18px"><button class="ib" data-a="back" aria-label="Voltar">${I.back}</button><header class="lt"><h1>Em alta${gid ? ' em ' + esc(gName(gid)) : ''}</h1></header>
     <section>${l ? l.map((r, i) => `<div class="row"><span class="trank">${i + 1}</span><div style="flex:1;min-width:0">${resultCard(r)}</div></div>`).join('') || '<p class="mut">Não consegui carregar o ranking agora.</p>' : loadingRow}</section></div>`;
 };
@@ -859,21 +868,22 @@ V.disc = () => {
   const head = `<div class="page dpage">
     <header class="lt"><h1>Descobrir</h1></header>
     <label class="search" style="margin-top:-18px">${I.search}<span style="position:absolute;width:1px;height:1px;overflow:hidden">Buscar</span><input type="search" id="q" placeholder="Buscar podcasts ou colar link RSS" value="${esc(D.q)}" data-k="search" enterkeyhint="search"></label>
+    ${myCountries().length > 1 ? `<div class="seg" role="group" aria-label="País dos rankings" style="overflow-x:auto">${myCountries().map(c => `<button class="${c === curCC() ? 'on' : ''}" data-a="ccPick" data-x="${c}">${esc(ccName(c))}</button>`).join('')}</div>` : ''}
     <div class="chips"><button class="chip ${g ? 'on' : ''}" data-a="cats">${g ? esc(gName(g)) : 'Todas as categorias'} <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${g ? `<button class="chip" data-a="genre" data-x="0">Limpar</button>` : ''}${quick.filter(q => q[0] !== g).map(([id, t]) => `<button class="chip" data-a="genre" data-x="${id}">${t}</button>`).join('')}</div>`;
   if (D.loading || D.res) return head + (D.loading ? '<div class="row mut"><span class="spin"></span> Buscando…</div>' : `<section><div class="sect"><h2>Resultados</h2><button class="link" data-a="clearSearch">Limpar</button></div>${D.res.map(resultCard).join('') || '<p class="mut">Nada encontrado.</p>'}</section>`) + '</div>';
-  const top = D.top[g];
+  const top = D.top[tk(g)];
   let out = head;
   out += `<section class="dband">${top ? (top.length ? featured(top, 'car-feat') : '<p class="mut">Não consegui carregar os destaques agora. Verifique a internet.</p>') : loadingRow}</section>`;
   out += `<section>${sectHead(g ? 'Em alta em ' + esc(gName(g)) : 'Em alta', g || '0')}${top ? pagedList(top.slice(7), 'car-trend') : loadingRow}</section>`;
   if (!g) {
     for (const s of becauseList()) {
-      const gid = subGenre(s); loadTop(gid); const l = D.top[gid];
+      const gid = subGenre(s); loadTop(gid); const l = D.top[tk(gid)];
       const items = l ? l.filter(r => !isFollowing(r)) : null;
       out += `<section><div class="dhead"><div class="row" style="gap:10px;min-width:0">${cov(s.image, s.title, '44px', '8px', 10)}<div style="min-width:0"><span class="mut" style="font-size:13px">Porque você gosta de</span><h2 class="ell">${esc(s.title)}</h2></div></div><button class="dmore" data-a="go" data-x="chart" data-y="${gid}">Ver tudo</button></div>${items ? (items.length ? bigCards(items) : '<p class="mut">Você já segue os mais ouvidos dessa categoria.</p>') : loadingRow}</section>`;
     }
     out += `<section>${sectHead('Categorias')}<div class="hcar">${GENRES.map(([id, t, c]) => `<button class="gcirc" data-a="genre" data-x="${id}"><span style="background:${c}">${esc(initials(t))}</span><b>${t}</b></button>`).join('')}</div></section>`;
     const extra = [...new Set([...genreWeights(), 1318, 1488, 1533])].filter(x => GENRES.some(gg => gg[0] === x)).slice(0, 3);
-    for (const gid of extra) { loadTop(gid); const l = D.top[gid]; out += `<section>${sectHead('Em alta em ' + esc(gName(gid)), String(gid))}${l ? bigCards(l) : loadingRow}</section>`; }
+    for (const gid of extra) { loadTop(gid); const l = D.top[tk(gid)]; out += `<section>${sectHead('Em alta em ' + esc(gName(gid)), String(gid))}${l ? bigCards(l) : loadingRow}</section>`; }
     const podroll = [...new Set(Object.values(db.subs).flatMap(s => (s.podroll || []).map(u => u + '|' + s.title)))].filter(x => !sub(x.split('|')[0])).slice(0, 6);
     if (podroll.length) out += `<section>${sectHead('Indicados pelos criadores')}<div style="display:flex;flex-direction:column;gap:8px">${podroll.map(x => { const [u, by] = x.split('|'); return `<button class="card row" style="padding:12px;border-radius:18px;color:var(--tx);text-align:left" data-a="preview" data-x="${esc(u)}"><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span class="ell" style="font-size:13px;font-weight:600">${esc(u.replace(/^https?:\/\//, ''))}</span><span class="mut" style="font-size:12px">indicado por ${esc(by)}</span></span></button>`; }).join('')}</div></section>`;
   } else {
@@ -986,7 +996,8 @@ V.set = () => {
       row('Atualizar agora', Object.keys(db.subs).length + ' podcasts', act('Atualizar', 'refresh')),
       row('Importar XML / OPML', 'Inscrições de outro app ou o XML (RSS) de um podcast', act('Importar', 'opmlImport')),
       row('Exportar OPML', 'Backup das inscrições', act('Exportar', 'opmlExport')),
-      row('País das buscas e rankings', '', sel('country', [['br', 'Brasil'], ['pt', 'Portugal'], ['us', 'Estados Unidos']]))
+      row('Países', 'Os rankings e destaques que você quer ver no Descobrir', `<button class="btn sm" data-a="ccSheet">${esc(myCountries().slice(0, 2).map(ccName).join(', ') + (myCountries().length > 2 ? ' +' + (myCountries().length - 2) : ''))}</button>`),
+      row('País principal', 'Usado nas buscas e aberto primeiro no Descobrir', sel('country', myCountries().map(c => [c, ccName(c)])))
     ]],
     ['Momentos', [
       row('Exportar momentos', db.snips.length + ' salvos · Markdown, pronto para o Obsidian', act('Exportar', 'snipExport'))
@@ -1262,6 +1273,16 @@ const ACT = {
   shareFeed: async x => { const t = (sub(x) || PREV[x] || {}).title || 'Podcast'; try { if (navigator.share) { await navigator.share({ title: t, url: x }); return; } } catch (e) { } toast((await copy(x)) ? 'Link do feed copiado' : x, 4000); },
   addRss: () => modal(`<h2>Adicionar por link</h2><p class="mut" style="font-size:13px">Cole o endereço RSS do podcast.</p><input class="txt" id="rssurl" placeholder="https://…" inputmode="url"><div class="wrapchips"><button class="btn pri" data-a="rssGo">Abrir</button><button class="btn" data-a="opmlImport">Importar arquivo XML</button><button class="btn" data-a="close">Cancelar</button></div>`),
   rssGo: () => { const u = $('#rssurl').value.trim(); if (!/^https?:\/\//.test(u)) { toast('Cole um link que comece com http'); return; } closeModal(); go('show', u); },
+  ccPick: x => { D.cc = x; hap(6); render(); },
+  ccSheet: () => ccSheet(),
+  ccToggle: (x, b) => {
+    let l = myCountries().slice(); const i = l.indexOf(x);
+    if (i >= 0) { if (l.length === 1) { toast('Escolha pelo menos um país'); return; } l.splice(i, 1); } else l.push(x);
+    db.set.countries = l; if (!l.includes(db.set.country)) db.set.country = l[0];
+    touch('setT'); save(); hap(6);
+    b.classList.toggle('on', i < 0); const n = $('#ccCount'); if (n) n.textContent = l.length + (l.length > 1 ? ' países' : ' país');
+  },
+  ccDone: () => { closeModal(); D.forYou = null; render(); },
   genre: x => { closeModal(); D.genre = +x || null; D.res = null; D.q = ''; if (view !== 'disc') go('disc'); else render(); $('#main').scrollTop = 0; },
   cats: () => modal(`<h2>Categorias</h2><div class="wrapchips"><button class="chip ${D.genre ? '' : 'on'}" data-a="genre" data-x="0">Todas</button>${GENRES.map(([id, t, c]) => `<button class="chip ${D.genre == id ? 'on' : ''}" data-a="genre" data-x="${id}"><span style="width:8px;height:8px;border-radius:4px;background:${c}"></span>${t}</button>`).join('')}</div><button class="btn" data-a="close">Fechar</button>`),
   clearSearch: () => { D.q = ''; D.res = null; render(); },
@@ -1283,6 +1304,14 @@ const ACT = {
   smartSave: x => { const p = x ? db.smart.find(y => y.id === x) : { id: rid() }; Object.assign(p, { name: $('#sm_name').value.trim() || 'Minha playlist', max: +$('#sm_max').value || 0, folder: $('#sm_folder').value, unplayed: $('#sm_un').checked, started: $('#sm_st').checked, dl: $('#sm_dl').checked, recent: +$('#sm_rec').value || 0, days: 0 }); if (!x) db.smart.push(p); touch('smartT'); closeModal(); save(); render(); },
   gdLogin: () => GD.login(), gdLogout: () => GD.logout(), gdSync: () => GD.sync(true)
 };
+function ccSheet() {
+  const mine = myCountries();
+  const row2 = ([c, n]) => `<button class="setr cc-row ${mine.includes(c) ? 'on' : ''}" data-a="ccToggle" data-x="${c}" data-name="${esc((n + ' ' + c).toLowerCase())}"><span class="tx"><b>${esc(n)}</b></span><svg class="cc-ok" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg></button>`;
+  modal(`<div class="row" style="justify-content:space-between"><h2>Países</h2><button class="link" style="font-weight:600" data-a="ccDone">Concluído</button></div>
+    <p class="mut" style="font-size:14px;margin-top:-6px">Escolha os países cujos rankings e destaques você quer ver. <span id="ccCount">${mine.length + (mine.length > 1 ? ' países' : ' país')}</span> selecionado${mine.length > 1 ? 's' : ''}.</p>
+    <label class="search">${I.search}<input type="search" placeholder="Buscar país" data-k="ccsearch" autocomplete="off"></label>
+    <div class="setg cc-list">${CC_SORTED.filter(([c]) => mine.includes(c)).map(row2).join('')}${CC_SORTED.filter(([c]) => !mine.includes(c)).map(row2).join('')}</div>`);
+}
 function smartEditor(p) {
   p = p || { name: '', max: 0, folder: '', unplayed: true };
   const fs = [...new Set(Object.values(db.subs).map(s => s.folder).filter(Boolean))];
@@ -1355,9 +1384,12 @@ $('#mbox').addEventListener('touchend', () => { if (!shd) return; const b = $('#
 document.addEventListener('click', ev => { if (Date.now() - swBlock < 350 && ev.target.closest('.sw-row')) { ev.preventDefault(); return; } const b = ev.target.closest('[data-a]'); if (!b || b.disabled) return; const f = ACT[b.dataset.a]; if (f) { ev.preventDefault(); f(b.dataset.x, b, ev); } });
 document.addEventListener('change', ev => {
   const el = ev.target; const c = el.dataset.c; if (!c) return;
-  if (c === 'set') { const k = el.dataset.k; const v = el.value; db.set[k] = isNaN(+v) || v === '' ? v : +v; touch('setT'); if (NP && (k === 'back' || k === 'fwd')) NP.setSkip(db.set.back * 1000, db.set.fwd * 1000); if (NP && k === 'cont') syncNativeQueue(); if (k === 'speed' && db.cur && !((subOf(db.cur) || {}).ps || {}).speed) A.playbackRate = +v; if (k === 'country') { D.top = {}; D.forYou = null; } save(); render(); }
+  if (c === 'set') { const k = el.dataset.k; const v = el.value; db.set[k] = isNaN(+v) || v === '' ? v : +v; touch('setT'); if (NP && (k === 'back' || k === 'fwd')) NP.setSkip(db.set.back * 1000, db.set.fwd * 1000); if (NP && k === 'cont') syncNativeQueue(); if (k === 'speed' && db.cur && !((subOf(db.cur) || {}).ps || {}).speed) A.playbackRate = +v; if (k === 'country') { D.cc = v; D.forYou = null; } save(); render(); }
   if (c === 'showSort') { showSort = el.value; render(); return; }
   if (c === 'ps') { const s = sub(el.dataset.x); s.ps = s.ps || {}; s.ps[el.dataset.k] = el.value === '' ? null : +el.value; s.t = now(); if (el.dataset.k === 'speed' && db.cur && ep(db.cur).feed === s.url) A.playbackRate = speedFor(ep(db.cur)); save(); }
+});
+document.addEventListener('input', ev => {
+  if (ev.target.dataset && ev.target.dataset.k === 'ccsearch') { const q = ev.target.value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); document.querySelectorAll('.cc-row').forEach(r => { r.style.display = !q || r.dataset.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(q) ? '' : 'none'; }); }
 });
 document.addEventListener('keydown', ev => {
   if (ev.target.dataset && ev.target.dataset.k === 'epsearch' && ev.key === 'Enter') { ev.preventDefault(); showQ = ev.target.value.trim(); render(); return; }

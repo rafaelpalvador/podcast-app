@@ -420,3 +420,9 @@ body.pvmode .main{padding-top:calc(env(safe-area-inset-top,0px) + 4px)}
 .setr:active{background-color:var(--grp2)}
 button.setr{transition:background-color .15s}
 #modal .box>*{flex-shrink:0}
+
+/* lista de países */
+.cc-row{width:100%;background:none;border:0;color:var(--tx);text-align:left}
+.cc-row .cc-ok{color:var(--acc);opacity:0;transition:opacity .15s,transform .25s var(--spring);transform:scale(.6)}
+.cc-row.on .cc-ok{opacity:1;transform:none}
+.cc-list .setr+.setr::before{left:16px}
