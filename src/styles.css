@@ -343,10 +343,10 @@ body.pvmode .main{padding-top:calc(env(safe-area-inset-top,0px) + 4px)}
 
 /* ---------- transições ---------- */
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.42s;animation-timing-function:var(--ease)}
-.vt-up::view-transition-new(root){animation:pv-grow .52s var(--ease) both}
-.vt-up::view-transition-old(root){animation:pv-dim .52s var(--ease) both}
-.vt-down::view-transition-old(root){animation:pv-shrink .46s var(--ease) both;z-index:2}
-.vt-down::view-transition-new(root){animation:pv-undim .46s var(--ease) both}
+.vt-up::view-transition-new(root){animation:pv-grow .32s var(--ease) both}
+.vt-up::view-transition-old(root){animation:pv-dim .32s var(--ease) both}
+.vt-down::view-transition-old(root){animation:pv-shrink .28s var(--ease) both;z-index:2}
+.vt-down::view-transition-new(root){animation:pv-undim .28s var(--ease) both}
 .vt-push::view-transition-new(root){animation-name:push-in}
 .vt-push::view-transition-old(root){animation-name:push-out}
 .vt-pop::view-transition-new(root){animation-name:pop-in}
