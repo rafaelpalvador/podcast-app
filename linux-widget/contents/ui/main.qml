@@ -64,7 +64,14 @@ PlasmoidItem {
             if (st !== 200) { fail("GitHub respondeu " + st); return; }
             var L = []; try { L = JSON.parse(txt); } catch (e) { }
             for (var i = 0; i < L.length; i++) if (L[i].files && L[i].files[fileName]) { gid = L[i].id; break; }
-            if (!gid) { fail("Nenhum dado do app no seu GitHub ainda. No celular: Ajustes → Sincronizar pelo GitHub → Conectar e depois Sincronizar."); return; }
+            if (!gid) {
+                var n = L.length;
+                api("GET", "/user", null, function(s2, t2) {
+                    var who = ""; try { who = "@" + JSON.parse(t2).login; } catch (e) { }
+                    fail("O token " + (who ? "da conta " + who + " " : "") + "vê " + n + (n === 1 ? " gist" : " gists") + ", mas nenhum com " + fileName + ". No celular, toque em Sincronizar e veja se aparece erro.");
+                });
+                return;
+            }
             cb(gid);
         });
     }
