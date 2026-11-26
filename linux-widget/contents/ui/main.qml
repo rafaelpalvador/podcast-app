@@ -64,7 +64,7 @@ PlasmoidItem {
             if (st !== 200) { fail("GitHub respondeu " + st); return; }
             var L = []; try { L = JSON.parse(txt); } catch (e) { }
             for (var i = 0; i < L.length; i++) if (L[i].files && L[i].files[fileName]) { gid = L[i].id; break; }
-            if (!gid) { fail("Ainda não há dados. Conecte o GitHub no app primeiro."); return; }
+            if (!gid) { fail("Nenhum dado do app no seu GitHub ainda. No celular: Ajustes → Sincronizar pelo GitHub → Conectar e depois Sincronizar."); return; }
             cb(gid);
         });
     }
@@ -505,8 +505,9 @@ PlasmoidItem {
 
             // ---------------- estados vazios
             ColumnLayout {
-                anchors.centerIn: parent
-                width: parent.width - 32
+                anchors.left: parent.left; anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: 20; anchors.rightMargin: 20
                 visible: root.shownId === ""
                 spacing: 8
                 Kirigami.Icon { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 32; Layout.preferredHeight: 32; source: "audio-headphones"; color: root.acc; isMask: true }
@@ -525,6 +526,13 @@ PlasmoidItem {
                     visible: !root.token
                     text: "Configurar"
                     onClicked: Plasmoid.internalAction("configure").trigger()
+                }
+                PillButton {
+                    app: root
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: root.token !== "" && !root.busy
+                    text: "Buscar agora"
+                    onClicked: root.pull()
                 }
             }
 
