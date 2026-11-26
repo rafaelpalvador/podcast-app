@@ -106,6 +106,7 @@ jobs:
     needs: [windows, android]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: arquivos
@@ -114,6 +115,8 @@ jobs:
           mkdir -p saida
           find arquivos -name "*.apk" | head -1 | xargs -I{} cp {} "saida/Podcast-Android.apk"
           find arquivos -name "*-setup.exe" | head -1 | xargs -I{} cp {} "saida/Podcast-Windows-instalador.exe"
+          sed -i "s/\"Version\": \"1.0\"/\"Version\": \"0.1.${{ github.run_number }}\"/" linux-widget/metadata.json
+          (cd linux-widget && zip -qr "../saida/Podcast-Linux-widget.plasmoid" .)
           ls -la saida
       - uses: softprops/action-gh-release@v2
         with:
@@ -123,9 +126,11 @@ jobs:
             Versão 0.1.${{ github.run_number }} (commit ${{ github.sha }}).
             - **Android:** `Podcast-Android.apk` — no Obtainium, use o endereço do repositório para receber as atualizações sozinho.
             - **Windows:** `Podcast-Windows-instalador.exe`.
+            - **Linux (KDE Plasma 6):** `Podcast-Linux-widget.plasmoid` — widget com o mesmo visual, sincronizado pelo GitHub.
             Links fixos (sempre a versão mais nova):
             - https://github.com/${{ github.repository }}/releases/latest/download/Podcast-Android.apk
             - https://github.com/${{ github.repository }}/releases/latest/download/Podcast-Windows-instalador.exe
+            - https://github.com/${{ github.repository }}/releases/latest/download/Podcast-Linux-widget.plasmoid
           prerelease: false
           make_latest: true
           files: saida/*

@@ -12,6 +12,7 @@ Links fixos, sempre a versão mais nova:
 
 - **Android:** [Podcast-Android.apk](https://github.com/rafaelpalvador/podcast-app/releases/latest/download/Podcast-Android.apk). No **Obtainium**, adicione o endereço deste repositório para receber as atualizações sozinho.
 - **Windows 11:** [Podcast-Windows-instalador.exe](https://github.com/rafaelpalvador/podcast-app/releases/latest/download/Podcast-Windows-instalador.exe)
+- **Linux (widget do KDE Plasma 6):** [Podcast-Linux-widget.plasmoid](https://github.com/rafaelpalvador/podcast-app/releases/latest/download/Podcast-Linux-widget.plasmoid). Veja *Widget para Linux* abaixo.
 
 Cada envio para o branch `main` compila de novo os dois (GitHub Actions) e substitui a versão em *Releases*.
 
@@ -23,6 +24,20 @@ Não há login com Google. Para deixar o celular e o PC iguais, o app usa um **g
 2. Copie o token, cole no app e conecte. Repita no outro aparelho.
 
 O app cria o gist `podcast-dados.json` na primeira vez e depois sincroniza sozinho (ao sair do app e uns segundos depois de cada mudança). O token fica só no aparelho e não dá acesso aos seus repositórios. Sem conectar, o app funciona normalmente, só no aparelho.
+
+## Widget para Linux (KDE Plasma 6)
+
+Um widget de área de trabalho com o visual do app (fundo preto, capa, cor âmbar) que lê o mesmo gist do GitHub. Mostra o episódio para continuar, toca o áudio ali mesmo, tem progresso clicável, voltar/avançar, velocidade e a fila. Quando você para de ouvir, a posição volta para o gist, e o celular continua de onde parou.
+
+O layout se adapta ao tamanho: pequeno mostra só a capa com o play; médio vira um cartão com controles; largo põe a capa ao lado e, com altura, aparece a fila. No painel ele vira um ícone.
+
+Instalar (no terminal, também funciona no fish):
+
+```
+kpackagetool6 -t Plasma/Applet -i ~/Downloads/Podcast-Linux-widget.plasmoid
+```
+
+Para atualizar, troque `-i` por `-u`. Depois: clique com o botão direito na área de trabalho → *Adicionar widgets* → **Podcast**, e em *Configurar* cole o token do GitHub (o mesmo do app). Precisa do pacote `qt6-multimedia` (no CachyOS/Arch: `sudo pacman -S qt6-multimedia`, se ainda não estiver instalado).
 
 ## O que já funciona (versão 0.1)
 
@@ -96,6 +111,7 @@ src-tauri/           parte nativa em Rust (rede, downloads, arquivos)
 android-assinatura/  chave que assina o APK
 assets/logo/         logo em SVG
 design/              fontes do design (.dc.html) e layout do canvas
+linux-widget/        widget do KDE Plasma 6 (QML)
 ```
 
 Os arquivos `.dc.html` são o formato do editor de design onde o projeto foi criado. Para ver e mexer, use o link do canvas acima.

@@ -1,0 +1,15 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [{ "Name": "rafaelpalvador" }],
+        "Category": "Multimedia",
+        "Description": "Continuar ouvindo e a fila do app Podcast, sincronizado pelo GitHub",
+        "Icon": "audio-headphones",
+        "Id": "app.rafael.podcast.widget",
+        "License": "MIT",
+        "Name": "Podcast",
+        "Version": "1.0",
+        "Website": "https://github.com/rafaelpalvador/podcast-app"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
