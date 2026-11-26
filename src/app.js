@@ -1471,6 +1471,13 @@ const SY = (() => {
     if (r.status === 401) { st.tok = null; persist(); render(); throw new Error('o token não vale mais, conecte de novo'); }
     return r;
   }
+  // Explica os erros do GitHub em português
+  function why(r, what) {
+    let m = ''; try { m = JSON.parse(r.text).message || ''; } catch (e) { }
+    if (r.status === 403 && /rate limit/i.test(m)) return 'o GitHub limitou as requisições, tente daqui a pouco';
+    if (r.status === 403 || r.status === 404) return 'o token não tem permissão para gists. Crie um token "classic" com a caixa gist marcada (botão Criar token) e conecte de novo';
+    return what + ' falhou (' + r.status + (m ? ': ' + m : '') + ')';
+  }
   async function connect(tok) {
     tok = (tok || '').trim(); if (!tok) { toast('Cole o token do GitHub'); return; }
     st.tok = tok;
@@ -1528,11 +1535,11 @@ const SY = (() => {
         else if (r.status === 200) {
           const f = (JSON.parse(r.text).files || {})[FILE];
           if (f) { const txt = f.truncated ? (await call('GET', f.raw_url)).text : f.content; merge(JSON.parse(txt || '{}')); }
-        } else throw new Error('leitura falhou (' + r.status + ')');
+        } else throw new Error(why(r, 'leitura'));
       }
       const files = { [FILE]: { content: payload() } };
       const r = id ? await call('PATCH', '/gists/' + id, { files }) : await call('POST', '/gists', { description: DESC, public: false, files });
-      if (r.status >= 300) throw new Error('envio falhou (' + r.status + ')');
+      if (r.status >= 300) throw new Error(why(r, 'envio'));
       if (!id) { st.gid = JSON.parse(r.text).id; }
       st.last = now(); persist(); persistNow(); if (manual) toast('Sincronizado');
     } catch (e) { st.err = 'Erro: ' + e.message; if (manual) toast('Sincronização: ' + e.message, 4000); }
