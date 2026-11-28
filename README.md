@@ -12,6 +12,7 @@ Links fixos, sempre a versão mais nova:
 
 - **Android:** [Podcast-Android.apk](https://github.com/rafaelpalvador/podcast-app/releases/latest/download/Podcast-Android.apk). No **Obtainium**, adicione o endereço deste repositório para receber as atualizações sozinho.
 - **Windows 11:** [Podcast-Windows-instalador.exe](https://github.com/rafaelpalvador/podcast-app/releases/latest/download/Podcast-Windows-instalador.exe)
+- **Linux (app):** [Podcast-Linux.AppImage](https://github.com/rafaelpalvador/podcast-app/releases/latest/download/Podcast-Linux.AppImage) para qualquer distro, ou [Podcast-Linux.tar.gz](https://github.com/rafaelpalvador/podcast-app/releases/latest/download/Podcast-Linux.tar.gz) para Arch/CachyOS (também há `.deb` e `.rpm` na página da versão). Veja *App para Linux* abaixo.
 - **Linux (widget do KDE Plasma 6):** [Podcast-Linux-widget.plasmoid](https://github.com/rafaelpalvador/podcast-app/releases/latest/download/Podcast-Linux-widget.plasmoid). Veja *Widget para Linux* abaixo.
 
 Cada envio para o branch `main` compila de novo os dois (GitHub Actions) e substitui a versão em *Releases*.
@@ -24,6 +25,29 @@ Não há login com Google. Para deixar o celular e o PC iguais, o app usa um **g
 2. Copie o token, cole no app e conecte. Repita no outro aparelho.
 
 O app cria o gist `podcast-dados.json` na primeira vez e depois sincroniza sozinho (ao sair do app e uns segundos depois de cada mudança). O token fica só no aparelho e não dá acesso aos seus repositórios. Sem conectar, o app funciona normalmente, só no aparelho.
+
+## App para Linux
+
+O mesmo app do celular e do Windows, com a mesma sincronização pelo GitHub.
+
+**AppImage (qualquer distro):** baixe, dê permissão e abra. Já vem com o que precisa para tocar áudio.
+
+```
+chmod +x ~/Downloads/Podcast-Linux.AppImage
+~/Downloads/Podcast-Linux.AppImage
+```
+
+No Arch/CachyOS, se o AppImage não abrir, instale o `fuse2` (`sudo pacman -S fuse2`).
+
+**Arch/CachyOS (.tar.gz, mais leve, usa as bibliotecas do sistema):**
+
+```
+sudo pacman -S --needed webkit2gtk-4.1 gst-plugins-good gst-plugins-bad gst-libav
+tar xzf ~/Downloads/Podcast-Linux.tar.gz -C ~/Downloads
+bash ~/Downloads/Podcast-Linux/instalar.sh
+```
+
+Ele aparece no menu de aplicativos como **Podcast**. Para atualizar, repita os dois últimos comandos com o arquivo novo; para remover, `bash ~/Downloads/Podcast-Linux/desinstalar.sh`.
 
 ## Widget para Linux (KDE Plasma 6)
 

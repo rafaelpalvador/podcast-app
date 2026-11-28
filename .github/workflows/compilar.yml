@@ -1,4 +1,4 @@
-name: Compilar apps (Windows e Android)
+name: Compilar apps (Windows, Linux e Android)
 
 on:
   workflow_dispatch:
@@ -37,6 +37,85 @@ jobs:
         with:
           name: Podcast-Windows
           path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+  linux:
+    name: Linux (AppImage, .deb, .rpm)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Bibliotecas do sistema (WebKitGTK e GStreamer para o áudio)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev file \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad gstreamer1.0-libav
+      - name: Número da versão (0.1.N, sobe a cada compilação)
+        run: |
+          node -e "const f='src-tauri/tauri.conf.json',j=JSON.parse(require('fs').readFileSync(f,'utf8'));j.version='0.1.${{ github.run_number }}';require('fs').writeFileSync(f,JSON.stringify(j,null,1))"
+          sed -i "s|/\*BUILD\*/{v:'dev',d:'',c:''}|{v:'0.1.${{ github.run_number }}',d:'$(date -u +%Y-%m-%dT%H:%M:%SZ)',c:'${GITHUB_SHA::7}'}|" src/index.html
+      - name: Instalar dependências
+        run: npm install
+      - name: Ícones do app
+        run: npx tauri icon src-tauri/icons/icon.png
+      - name: Compilar
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          NO_STRIP: true
+        run: npx tauri build --bundles appimage,deb,rpm
+      - name: Pacote simples (.tar.gz) para Arch/CachyOS e outras
+        run: |
+          D=Podcast-Linux
+          mkdir -p "$D"
+          cp src-tauri/target/release/podcast-app "$D/podcast"
+          cp src-tauri/icons/128x128@2x.png "$D/podcast.png"
+          cat > "$D/podcast.desktop" <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Podcast
+          Comment=App de podcast pessoal
+          Exec=podcast
+          Icon=app.rafael.podcast
+          Terminal=false
+          Categories=AudioVideo;Audio;Player;
+          StartupWMClass=podcast
+          EOF
+          cat > "$D/instalar.sh" <<'EOF'
+          #!/usr/bin/env bash
+          # Instala o Podcast só para o seu usuário (sem sudo): ~/.local
+          set -e
+          cd "$(dirname "$0")"
+          mkdir -p ~/.local/bin ~/.local/share/applications ~/.local/share/icons/hicolor/256x256/apps
+          install -m755 podcast ~/.local/bin/podcast
+          install -m644 podcast.png ~/.local/share/icons/hicolor/256x256/apps/app.rafael.podcast.png
+          sed "s|^Exec=.*|Exec=$HOME/.local/bin/podcast|" podcast.desktop > ~/.local/share/applications/app.rafael.podcast.desktop
+          update-desktop-database ~/.local/share/applications 2>/dev/null || true
+          echo "Pronto: procure Podcast no menu de aplicativos."
+          echo "Para tocar áudio, o sistema precisa do GStreamer (no CachyOS/Arch: sudo pacman -S --needed webkit2gtk-4.1 gst-plugins-good gst-plugins-bad gst-libav)."
+          EOF
+          cat > "$D/desinstalar.sh" <<'EOF'
+          #!/usr/bin/env bash
+          rm -f ~/.local/bin/podcast ~/.local/share/applications/app.rafael.podcast.desktop ~/.local/share/icons/hicolor/256x256/apps/app.rafael.podcast.png
+          echo "Podcast removido (seus dados ficam em ~/.local/share/app.rafael.podcast)."
+          EOF
+          chmod +x "$D"/*.sh "$D/podcast"
+          tar czf Podcast-Linux.tar.gz "$D"
+          ls -la src-tauri/target/release/bundle/*/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Podcast-Linux
+          path: |
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            Podcast-Linux.tar.gz
           if-no-files-found: error
 
   android:
@@ -153,7 +232,7 @@ jobs:
 
   publicar:
     name: Publicar em Releases
-    needs: [windows, android, testes]
+    needs: [windows, linux, android, testes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -165,6 +244,10 @@ jobs:
           mkdir -p saida
           find arquivos -name "*.apk" | head -1 | xargs -I{} cp {} "saida/Podcast-Android.apk"
           find arquivos -name "*-setup.exe" | head -1 | xargs -I{} cp {} "saida/Podcast-Windows-instalador.exe"
+          find arquivos -name "*.AppImage" | head -1 | xargs -I{} cp {} "saida/Podcast-Linux.AppImage"
+          find arquivos -name "*.deb" | head -1 | xargs -I{} cp {} "saida/Podcast-Linux.deb"
+          find arquivos -name "*.rpm" | head -1 | xargs -I{} cp {} "saida/Podcast-Linux.rpm"
+          find arquivos -name "Podcast-Linux.tar.gz" | head -1 | xargs -I{} cp {} "saida/Podcast-Linux.tar.gz"
           sed -i "s/\"Version\": \"1.0\"/\"Version\": \"0.1.${{ github.run_number }}\"/" linux-widget/metadata.json
           (cd linux-widget && zip -qr "../saida/Podcast-Linux-widget.plasmoid" .)
           ls -la saida
@@ -176,10 +259,13 @@ jobs:
             Versão 0.1.${{ github.run_number }} (commit ${{ github.sha }}).
             - **Android:** `Podcast-Android.apk` — no Obtainium, use o endereço do repositório para receber as atualizações sozinho.
             - **Windows:** `Podcast-Windows-instalador.exe`.
-            - **Linux (KDE Plasma 6):** `Podcast-Linux-widget.plasmoid` — widget com o mesmo visual, sincronizado pelo GitHub.
+            - **Linux:** `Podcast-Linux.AppImage` (roda em qualquer distro), `.deb`, `.rpm` ou `Podcast-Linux.tar.gz` (Arch/CachyOS, instala com `bash instalar.sh`).
+            - **Linux (widget do KDE Plasma 6):** `Podcast-Linux-widget.plasmoid` — widget com o mesmo visual, sincronizado pelo GitHub.
             Links fixos (sempre a versão mais nova):
             - https://github.com/${{ github.repository }}/releases/latest/download/Podcast-Android.apk
             - https://github.com/${{ github.repository }}/releases/latest/download/Podcast-Windows-instalador.exe
+            - https://github.com/${{ github.repository }}/releases/latest/download/Podcast-Linux.AppImage
+            - https://github.com/${{ github.repository }}/releases/latest/download/Podcast-Linux.tar.gz
             - https://github.com/${{ github.repository }}/releases/latest/download/Podcast-Linux-widget.plasmoid
           prerelease: false
           make_latest: true
