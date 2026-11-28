@@ -14,7 +14,19 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["protocol-asset"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2", "gzip", "brotli", "deflate"] }
 base64 = "0.22"
-tiny_http = "0.12"
 tauri-plugin-opener = "2"
+# Feeds lidos em Rust (rápido e fora da thread da interface)
+quick-xml = "0.37"
+html-escape = "0.2"
+# Miniaturas das capas no tamanho certo, com cache em disco
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+percent-encoding = "2"
+tokio = { version = "1", features = ["sync"] }
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+opt-level = 3
+strip = true

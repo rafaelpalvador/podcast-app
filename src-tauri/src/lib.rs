@@ -2,7 +2,10 @@ use serde::Serialize;
 use std::{collections::BTreeMap, fs, path::PathBuf};
 use tauri::Manager;
 
-// ---------- HTTP sem limites de CORS (feeds RSS, busca, Google) ----------
+mod feed;
+mod thumb;
+
+// ---------- HTTP sem limites de CORS (feeds RSS, busca, GitHub) ----------
 #[derive(Serialize)]
 struct HttpOut {
     status: u16,
@@ -10,12 +13,20 @@ struct HttpOut {
     headers: BTreeMap<String, String>,
 }
 
-fn client(secs: u64) -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(secs))
-        .user_agent("PodcastApp/0.1 (app pessoal; +https://github.com/rafaelpalvador/podcast-app)")
-        .build()
-        .map_err(|e| e.to_string())
+/// Um cliente só para o app inteiro: reaproveita conexões e sessões TLS
+/// (antes cada pedido abria uma conexão nova, com handshake completo).
+pub(crate) fn net() -> &'static reqwest::Client {
+    static C: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+    C.get_or_init(|| {
+        reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(12))
+            .pool_idle_timeout(std::time::Duration::from_secs(90))
+            .pool_max_idle_per_host(6)
+            .tcp_keepalive(std::time::Duration::from_secs(60))
+            .user_agent("PodcastApp/0.1 (app pessoal; +https://github.com/rafaelpalvador/podcast-app)")
+            .build()
+            .expect("cliente HTTP")
+    })
 }
 
 #[tauri::command]
@@ -28,7 +39,7 @@ async fn http_req(
     use base64::Engine;
     let b64 = base64::engine::general_purpose::STANDARD;
     let m = reqwest::Method::from_bytes(method.as_bytes()).map_err(|e| e.to_string())?;
-    let mut rq = client(60)?.request(m, &url);
+    let mut rq = net().request(m, &url).timeout(std::time::Duration::from_secs(60));
     for (k, v) in headers.iter() {
         rq = rq.header(k.as_str(), v.as_str());
     }
@@ -60,17 +71,68 @@ fn safe_name(s: &str) -> String {
 
 #[tauri::command]
 async fn download_episode(app: tauri::AppHandle, url: String, name: String) -> Result<String, String> {
+    use std::io::Write;
     let dir = dl_dir(&app)?;
     let path = dir.join(safe_name(&name));
-    let rs = client(1800)?.get(&url).send().await.map_err(|e| e.to_string())?;
+    let mut rs = net()
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(1800))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
     if !rs.status().is_success() {
         return Err(format!("erro {}", rs.status().as_u16()));
     }
-    let bytes = rs.bytes().await.map_err(|e| e.to_string())?;
+    // grava em partes: não segura o episódio inteiro (100+ MB) na memória
     let tmp = path.with_extension("part");
-    fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
+    let mut f = std::io::BufWriter::with_capacity(256 * 1024, fs::File::create(&tmp).map_err(|e| e.to_string())?);
+    while let Some(chunk) = rs.chunk().await.map_err(|e| e.to_string())? {
+        f.write_all(&chunk).map_err(|e| e.to_string())?;
+    }
+    f.flush().map_err(|e| e.to_string())?;
+    drop(f);
     fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().to_string())
+}
+
+// ---------- Feeds ----------
+#[derive(Serialize)]
+struct FeedOut {
+    status: u16,
+    etag: Option<String>,
+    modified: Option<String>,
+    feed: Option<feed::Feed>,
+}
+
+/// Baixa e lê um feed fora da interface. Com etag/modified, um feed sem mudanças volta como 304.
+#[tauri::command]
+async fn fetch_feed(url: String, etag: Option<String>, modified: Option<String>, max: Option<usize>) -> Result<FeedOut, String> {
+    let mut rq = net()
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(45))
+        .header("Accept", "application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5");
+    if let Some(e) = etag.as_deref().filter(|s| !s.is_empty()) {
+        rq = rq.header("If-None-Match", e);
+    }
+    if let Some(m) = modified.as_deref().filter(|s| !s.is_empty()) {
+        rq = rq.header("If-Modified-Since", m);
+    }
+    let rs = rq.send().await.map_err(|e| e.to_string())?;
+    let status = rs.status().as_u16();
+    if status == 304 {
+        return Ok(FeedOut { status, etag, modified, feed: None });
+    }
+    if !rs.status().is_success() {
+        return Err(format!("erro {}", status));
+    }
+    let hv = |k: &str| rs.headers().get(k).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+    let (et, lm) = (hv("etag"), hv("last-modified"));
+    let bytes = rs.bytes().await.map_err(|e| e.to_string())?;
+    let max = max.unwrap_or(200);
+    let f = tauri::async_runtime::spawn_blocking(move || feed::parse(&bytes, max))
+        .await
+        .map_err(|e| e.to_string())??;
+    Ok(FeedOut { status, etag: et, modified: lm, feed: Some(f) })
 }
 
 #[tauri::command]
@@ -99,28 +161,6 @@ fn downloads_size(app: tauri::AppHandle) -> Result<u64, String> {
         }
     }
     Ok(total)
-}
-
-// ---------- Banco de dados do app num arquivo (sem o limite de ~5 MB do localStorage) ----------
-fn db_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let d = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    fs::create_dir_all(&d).map_err(|e| e.to_string())?;
-    Ok(d.join("podcast-dados.json"))
-}
-
-#[tauri::command]
-fn db_read(app: tauri::AppHandle) -> Result<Option<String>, String> {
-    let p = db_path(&app)?;
-    if !p.exists() { return Ok(None); }
-    fs::read_to_string(p).map(Some).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn db_write(app: tauri::AppHandle, text: String) -> Result<(), String> {
-    let p = db_path(&app)?;
-    let tmp = p.with_extension("tmp");
-    fs::write(&tmp, text).map_err(|e| e.to_string())?;
-    fs::rename(&tmp, &p).map_err(|e| e.to_string())
 }
 
 // ---------- Salvar arquivo de texto (OPML, momentos em Markdown) ----------
@@ -161,72 +201,27 @@ fn store_read(app: tauri::AppHandle, name: String) -> Result<Option<String>, Str
     fs::read_to_string(p).map(Some).map_err(|e| e.to_string())
 }
 
-// ---------- Login do Google (OAuth com retorno para 127.0.0.1) ----------
-mod oauth {
-    use std::{sync::Mutex, time::Duration};
-    pub static RESULT: Mutex<Option<String>> = Mutex::new(None);
-    pub fn listen() -> Result<u16, String> {
-        let server = tiny_http::Server::http("127.0.0.1:0").map_err(|e| e.to_string())?;
-        let port = server.server_addr().to_ip().map(|a| a.port()).ok_or("sem porta")?;
-        if let Ok(mut r) = RESULT.lock() {
-            *r = None;
-        }
-        std::thread::spawn(move || {
-            let deadline = std::time::Instant::now() + Duration::from_secs(600);
-            while std::time::Instant::now() < deadline {
-                let rq = match server.recv_timeout(Duration::from_millis(500)) {
-                    Ok(Some(r)) => r,
-                    Ok(None) => continue,
-                    Err(_) => break,
-                };
-                let url = rq.url().to_string();
-                if !url.contains("code=") && !url.contains("error=") {
-                    let _ = rq.respond(tiny_http::Response::from_string("").with_status_code(404));
-                    continue;
-                }
-                let html = "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><body style='font-family:system-ui;text-align:center;padding:48px 20px;background:#0C0D10;color:#F3F4F6'><h2>Pronto!</h2><p>Você entrou com o Google. Pode fechar esta aba e voltar ao <b>Podcast</b>.</p></body>";
-                let mut resp = tiny_http::Response::from_string(html);
-                if let Ok(h) = tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..]) {
-                    resp.add_header(h);
-                }
-                let _ = rq.respond(resp);
-                if let Ok(mut r) = RESULT.lock() {
-                    *r = Some(url);
-                }
-                break;
-            }
-        });
-        Ok(port)
-    }
-}
-
-#[tauri::command]
-fn oauth_listen() -> Result<u16, String> {
-    oauth::listen()
-}
-
-#[tauri::command]
-fn oauth_poll() -> Option<String> {
-    oauth::RESULT.lock().ok().and_then(|mut r| r.take())
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .register_asynchronous_uri_scheme_protocol("thumb", |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
+            let uri = request.uri().to_string();
+            tauri::async_runtime::spawn(async move {
+                responder.respond(thumb::handle(app, uri).await);
+            });
+        })
         .invoke_handler(tauri::generate_handler![
             http_req,
+            fetch_feed,
             download_episode,
             delete_download,
             download_path,
             downloads_size,
             save_text,
             store_write,
-            store_read,
-            db_read,
-            db_write,
-            oauth_listen,
-            oauth_poll
+            store_read
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o app");
