@@ -74,7 +74,7 @@ jobs:
         run: |
           D=Podcast-Linux
           mkdir -p "$D"
-          cp src-tauri/target/release/podcast-app "$D/podcast"
+          cp src-tauri/target/release/Podcast "$D/podcast"
           cp src-tauri/icons/128x128@2x.png "$D/podcast.png"
           cat > "$D/podcast.desktop" <<'EOF'
           [Desktop Entry]
@@ -85,7 +85,7 @@ jobs:
           Icon=app.rafael.podcast
           Terminal=false
           Categories=AudioVideo;Audio;Player;
-          StartupWMClass=podcast
+          StartupWMClass=Podcast
           EOF
           cat > "$D/instalar.sh" <<'EOF'
           #!/usr/bin/env bash
