@@ -350,7 +350,7 @@ mod tests {
     use super::*;
     #[test]
     fn le_feed_basico() {
-        let xml = br#"<?xml version="1.0"?><rss xmlns:itunes="x" xmlns:content="y" xmlns:podcast="z"><channel>
+        let xml = r##"<?xml version="1.0"?><rss xmlns:itunes="x" xmlns:content="y" xmlns:podcast="z"><channel>
 <title>Pod &amp; Teste</title><itunes:author>Autor</itunes:author><itunes:image href="https://ex.com/i.jpg"/>
 <description><![CDATA[<p>Um <b>podcast</b> &eacute; bom</p>]]></description><itunes:category text="Technology"/>
 <podcast:podroll><podcast:remoteItem feedGuid="g" feedUrl="https://outro.com/f.xml"/></podcast:podroll>
@@ -358,7 +358,7 @@ mod tests {
 <enclosure url="https://ex.com/1.mp3" type="audio/mpeg" length="1"/><content:encoded><![CDATA[<p>Olá <a href="#">mundo</a></p><p>Linha 2</p>]]></content:encoded>
 <itunes:image href="https://ex.com/e1.jpg"/><podcast:transcript url="https://ex.com/t.vtt" type="text/VTT"/></item>
 <item><title>Sem áudio</title></item>
-</channel></rss>"#;
+</channel></rss>"##.as_bytes();
         let f = parse(xml, 200).unwrap();
         assert_eq!(f.title, "Pod & Teste");
         assert_eq!(f.author, "Autor");
