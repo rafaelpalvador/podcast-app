@@ -179,7 +179,10 @@ async function fetchFeedRaw(url, cond) {
     try {
       const r = await inv('fetch_feed', { url, etag: cond && cond.etag || null, modified: cond && cond.modified || null, max: 200 });
       if (r && typeof r.status === 'number') return { status: r.status, etag: r.etag, modified: r.modified, feed: r.feed ? normFeed(r.feed) : null };
-    } catch (e) { if (!/fetch_feed|not found|unknown/i.test(String(e))) throw new Error(String(e)); }
+    } catch (e) {
+      // erro de rede/servidor: não adianta tentar de novo; erro de leitura: tenta o leitor do JS
+      if (/^erro \d+|timed out|dns|connect|tempo/i.test(String(e))) throw new Error(String(e));
+    }
   }
   return { status: 200, feed: parseFeed(await getText(url)) };
 }

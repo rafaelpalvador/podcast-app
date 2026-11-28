@@ -101,9 +101,59 @@ jobs:
           path: Podcast-Android.apk
           if-no-files-found: error
 
+  testes:
+    name: Testes do leitor de feeds (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Testar com feeds reais
+        run: |
+          mkdir -p /tmp/ft/src && cd /tmp/ft
+          cat > Cargo.toml <<'EOF'
+          [package]
+          name = "ft"
+          version = "0.1.0"
+          edition = "2021"
+          [dependencies]
+          quick-xml = "0.37"
+          html-escape = "0.2"
+          serde = { version = "1", features = ["derive"] }
+          EOF
+          cp "$GITHUB_WORKSPACE/src-tauri/src/feed.rs" src/feed.rs
+          cat > src/main.rs <<'EOF'
+          #[allow(dead_code)]
+          mod feed;
+          fn main() {
+              let mut ok = 0;
+              for p in std::env::args().skip(1) {
+                  let b = std::fs::read(&p).unwrap();
+                  if b.len() < 200 || !String::from_utf8_lossy(&b[..b.len().min(3000)]).contains("<rss") { println!("{} pulado (não é RSS)", p); continue; }
+                  let t = std::time::Instant::now();
+                  match feed::parse(&b, 200) {
+                      Ok(f) => {
+                          let i = f.items.first();
+                          println!("{} KB -> '{}' | {} episódios em {:?}\n   1º: {:?} | {:?} | dur {:?}\n   desc: {}", b.len() / 1024, f.title, f.items.len(), t.elapsed(),
+                              i.map(|x| &x.title), i.map(|x| &x.url), i.map(|x| &x.dur), i.map(|x| x.desc.chars().take(100).collect::<String>()).unwrap_or_default());
+                          assert!(!f.items.is_empty() && !f.title.is_empty());
+                          ok += 1;
+                      }
+                      Err(e) => { println!("{}: ERRO {}", p, e); std::process::exit(1); }
+                  }
+              }
+              println!("{} feeds lidos", ok);
+          }
+          EOF
+          cargo test --quiet
+          i=0
+          for u in https://feeds.npr.org/510289/podcast.xml https://feeds.simplecast.com/54nAGcIl https://lexfridman.com/feed/podcast/ https://feeds.megaphone.fm/stuffyoushouldknow https://anchor.fm/s/1b8a1e8c/podcast/rss https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/A91018A4-EA4F-4130-BF55-AE270180C327/44710ECC-10BB-48D1-93C7-AE270180C33E/podcast.rss; do
+            i=$((i+1)); curl -sL --max-time 40 -A "PodcastApp/0.1" -o "f$i.xml" "$u" || true
+          done
+          cargo run --quiet --release -- f*.xml
+
   publicar:
     name: Publicar em Releases
-    needs: [windows, android]
+    needs: [windows, android, testes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
