@@ -12,6 +12,7 @@ import QtMultimedia
 import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
+import org.kde.plasma.plasma5support as P5Support
 
 PlasmoidItem {
     id: root
@@ -31,6 +32,29 @@ PlasmoidItem {
     switchHeight: Kirigami.Units.gridUnit * 5
     toolTipMainText: shownId ? epTitle(shownId) : "Podcast"
     toolTipSubText: shownId ? showTitle(shownId) : (token ? "Nada para continuar" : "Configure o token do GitHub")
+
+    // ------------------------------------------------------------ abrir o app
+    P5Support.DataSource {
+        id: shell
+        engine: "executable"
+        connectedSources: []
+        onNewData: function(source, data) { disconnectSource(source); }
+    }
+    // Abre o app Podcast (ou traz a janela, se já estiver aberto). Pausa o áudio do widget para não tocar em dobro.
+    function openApp() {
+        if (playing) { mp.pause(); }
+        shell.connectSource("sh -c 'P=$(command -v podcast || echo \"$HOME/.local/bin/podcast\"); "
+            + "if [ -x \"$P\" ]; then setsid -f \"$P\" >/dev/null 2>&1; "
+            + "else setsid -f gtk-launch app.rafael.podcast >/dev/null 2>&1; fi' # " + Date.now());
+        root.expanded = false;
+    }
+    Plasmoid.contextualActions: [
+        PlasmaCore.Action {
+            text: "Abrir o app Podcast"
+            icon.name: "audio-headphones"
+            onTriggered: root.openApp()
+        }
+    ]
 
     // ------------------------------------------------------------ dados (gist)
     readonly property string token: (Plasmoid.configuration.token || "").trim()
@@ -310,6 +334,7 @@ PlasmoidItem {
                 anchors.fill: parent
                 visible: full.mini && root.shownId !== ""
                 Image { anchors.fill: parent; source: full.img; fillMode: Image.PreserveAspectCrop; asynchronous: true }
+                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.openApp() }
                 Rectangle {
                     anchors.fill: parent
                     gradient: Gradient {
@@ -361,6 +386,15 @@ PlasmoidItem {
                             shadow.yOffset: 4
                             visible: full.img !== ""
                         }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
+                            onClicked: root.openApp()
+                            QQC2.ToolTip.visible: containsMouse
+                            QQC2.ToolTip.delay: 600
+                            QQC2.ToolTip.text: "Abrir o app"
+                        }
                     }
 
                     ColumnLayout {
@@ -379,6 +413,7 @@ PlasmoidItem {
                             text: root.epTitle(root.shownId)
                             color: root.tx; font.family: root.fam; font.pixelSize: full.wide ? 19 : 16; font.weight: Font.Bold
                             wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight
+                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.openApp() }
                         }
                         Text {
                             Layout.fillWidth: true
@@ -533,6 +568,12 @@ PlasmoidItem {
                     visible: !root.token
                     text: "Configurar"
                     onClicked: Plasmoid.internalAction("configure").trigger()
+                }
+                PillButton {
+                    app: root
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "Abrir o app"
+                    onClicked: root.openApp()
                 }
                 PillButton {
                     app: root
