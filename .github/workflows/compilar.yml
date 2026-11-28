@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths-ignore: ['design/**', 'assets/**', '**.md']
+    paths-ignore: ['design/**', 'assets/**', 'linux/**', '**.md']
 
 permissions:
   contents: write
